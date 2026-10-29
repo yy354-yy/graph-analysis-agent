@@ -8,13 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 浏览器 ──SSE──> orchestrator2.0/server.py (端口 5200)
-                 └─ pipeline.py 编排（意图→分支→搜索→证据→分析）
+                 └─ pipeline.py 编排（模式分流→意图→分支→搜索→证据→分析）
                      ├─ store.py    图工具 + 证据查询（进程内直调）
                      ├─ gateway.py  Galaxybase REST 客户端 + SQLite 存储
                      ├─ prompts.py  全部提示词
                      ├─ llm.py      LLM 算力层（SFM 生产 / Dify 本地测试）
                      └─ settings.py 运行时配置热更新
 ```
+
+**三能力分流（/api/chat 带 mode：auto/analysis/qa/writing）**：手动模式优先直入对应流程；
+auto 用扩展意图识别任务域（概念问答→qa、成文请求→writing），并有写作续写守卫
+（state.task=writing 时修改类短语继续改稿）。state 额外存 last_report（分析结果，
+写作素材）、writing_draft/writing_reqs（当前文稿与累计要求）。
 
 **编排全部在 Python 内完成，智能体平台只当 LLM 算力**（平台侧工作流仅
 开始→LLM→回复 三节点）。旧的平台转发网关（根目录 app.py）已删除，其

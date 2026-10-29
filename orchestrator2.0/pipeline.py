@@ -78,17 +78,20 @@ def _extract_json(text):
         return {}
 
 
-def _intent(query, ctx):
-    """意图识别 + 兜底（对应节点 4/5）"""
+def _intent(query, ctx, tasks=False):
+    """意图识别 + 兜底（对应节点 4/5）。tasks=True（自动模式）时附带
+    qa/writing 扩展规则，action 可能多返回两个任务域。"""
     text = llm.llm_complete(
-        prompts.INTENT_PROMPT,
+        prompts.intent_prompt(tasks),
         prompts.context_block(store.history_text(ctx),
                               json.dumps(ctx["state"], ensure_ascii=False))
         + u"\n【本轮输入】\n" + query)
     r = _extract_json(text)
     action = r.get("action")
     keyword = _text(r.get("business_keyword")).strip()
-    if action not in ("search", "targeted", "fact", "chat"):
+    valid = ("search", "targeted", "fact", "chat") + \
+        (("qa", "writing") if tasks else ())
+    if action not in valid:
         # 兜底收紧：提取到了业务名 → search（宁可重搜，不可困在旧 selected 上）；
         # 没有业务名但有已选/候选 → targeted；都没有 → search（会在后面转 chat）
         state = ctx["state"]
@@ -98,27 +101,134 @@ def _intent(query, ctx):
             action = "targeted"
         else:
             action = "search"
+    if action in ("qa", "writing"):
+        return {"action": action, "keyword": u"",
+                "change_desc": _text(r.get("change_desc")).strip()}
     if action in ("search", "fact") and not keyword:
         action = "chat"
     return {"action": action, "keyword": keyword,
             "change_desc": _text(r.get("change_desc")).strip()}
 
 
-def run_pipeline(query, conv_id):
-    """主入口。yield str（回答文本块）或 ("error", 消息)。"""
+def run_pipeline(query, conv_id, mode=u"auto"):
+    """主入口。mode：auto（自动分流）/ analysis / qa / writing，
+    手动模式优先；yield str（回答文本块）或 ("error", 消息)。"""
     try:
-        for item in _run(query, conv_id):
+        for item in _run(query, conv_id, mode):
             yield item
     except Exception as e:  # LLM/图库等任何未预期异常
         yield ("error", u"处理出错：{}".format(e))
 
 
-def _run(query, conv_id):
+# 写作续写短语（上次任务是写作时，这些修改类输入继续写作而非重判）
+_WRITE_REV_RE = re.compile(
+    u"(再.{0,6}(正式|口语|简洁|精简|详细|长|短一些|改|润色|写一版)|正式(一些|点)|"
+    u"口语(一点|些)|缩短|加长|扩写|精简|润色|改写|篇幅|换个语气|语气(正式|轻松)|"
+    u"再修改|再润色|简短(一些|点)|详细(一些|点))")
+_MODES = (u"auto", u"analysis", u"qa", u"writing")
+
+
+def _run(query, conv_id, mode=u"auto"):
     yield ("status", u"正在理解问题…")
     ctx = store.get_context(conv_id)
-    intent = _intent(query, ctx)
     state = ctx["state"]
+    mode = (_text(mode) or u"auto").lower()
+    if mode not in _MODES:
+        mode = u"auto"
 
+    # ---- 任务域分流：手动模式优先；auto 扩展意图 + 写作续写守卫 ----
+    task = u"analysis"
+    if mode in (u"qa", u"writing"):
+        task = mode
+        intent = {"action": task, "keyword": u"", "change_desc": u""}
+    else:
+        if _text(state.get("task")) == u"writing" and _WRITE_REV_RE.search(query):
+            # 上次任务是写作且本轮是修改类短语：继续修改当前文稿，不重判
+            task = u"writing"
+            intent = {"action": u"writing", "keyword": u"", "change_desc": u""}
+        else:
+            intent = _intent(query, ctx, tasks=(mode == u"auto"))
+            if intent["action"] in (u"qa", u"writing"):
+                task = intent["action"]
+
+    if task == u"qa":
+        for chunk in _qa(query, ctx, conv_id):
+            yield chunk
+        return
+    if task == u"writing":
+        for chunk in _writing(query, ctx, conv_id):
+            yield chunk
+        return
+
+    # ---- 业务分析域（原四分支流程）；顺带收集回答供智能写作当素材 ----
+    buf = []
+    for item in _analysis(query, intent, state, ctx, conv_id):
+        if isinstance(item, tuple):
+            yield item
+        else:
+            buf.append(item)
+            yield item
+    report = u"".join(buf).strip()
+    merged = dict(state)
+    merged.update(store.get_context(conv_id)["state"])
+    merged["task"] = u"analysis"
+    if intent["action"] != u"chat" and report:
+        merged["last_report"] = report[-4000:]   # 分析结果作为写作素材
+    store.save_state(conv_id, merged)
+
+
+def _qa(query, ctx, conv_id):
+    """智能问答：通用知识/概念解释（与图数据库无关），可引用最近分析结果"""
+    yield ("status", u"正在思考…")
+    state = ctx["state"]
+    last = _text(state.get("last_report"))
+    ctx_text = (u"【对话历史】\n{}\n".format(store.history_text(ctx) or u"（无）") +
+                (u"【最近分析结果】（问题相关时可引用其中事实）\n{}\n"
+                 .format(last[-2500:]) if last else u"") +
+                u"【本轮输入】\n" + query)
+    for chunk in _stream(prompts.QA_PROMPT, ctx_text):
+        yield chunk
+    merged = dict(state)
+    merged.update(store.get_context(conv_id)["state"])
+    merged["task"] = u"qa"
+    store.save_state(conv_id, merged)
+
+
+def _writing(query, ctx, conv_id):
+    """智能写作：起草/修改文稿。草稿与累计写作要求存会话状态——同一会话内
+    连续修改（手动 writing 模式，或自动模式 + 修改类短语）始终基于当前文稿。"""
+    state = ctx["state"]
+    draft = _text(state.get("writing_draft"))
+    material = _text(state.get("last_report"))
+    reqs = [_text(r) for r in (state.get("writing_reqs") or [])
+            if _text(r).strip()]
+    if draft:
+        yield ("status", u"正在修改文稿…")
+        ctx_text = (u"【当前文稿】\n{}\n【历史写作要求】\n{}\n"
+                    u"【分析素材】（事实依据，仅供核对）\n{}\n【修改要求】\n{}"
+                    .format(draft, u"；".join(reqs[-8:]) or u"（无）",
+                            material[-2000:] or u"（无）", query))
+    else:
+        yield ("status", u"正在起草…")
+        ctx_text = (u"【写作要求】\n{}\n【分析素材】（事实依据，有则必须引用）\n{}\n"
+                    u"【对话历史】\n{}"
+                    .format(query, material[-3000:] or u"（无）",
+                            store.history_text(ctx) or u"（无）"))
+    buf = []
+    for chunk in _stream(prompts.WRITING_PROMPT, ctx_text):
+        buf.append(chunk)
+        yield chunk
+    new_draft = u"".join(buf).strip()
+    merged = dict(state)
+    merged.update(store.get_context(conv_id)["state"])
+    merged["task"] = u"writing"
+    if new_draft:
+        merged["writing_draft"] = new_draft
+    merged["writing_reqs"] = (reqs + [query])[-8:]
+    store.save_state(conv_id, merged)
+
+
+def _analysis(query, intent, state, ctx, conv_id):
     # 纯序号/ID 回复且状态里有候选：一定是选择行为，强制 targeted
     # （意图识别偶尔会把"2"判成 search 重搜一轮，导致用户选择失效）
     if store._ordinal(query) and (state.get("candidates")

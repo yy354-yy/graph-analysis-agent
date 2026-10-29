@@ -393,7 +393,13 @@
     color: var(--text); background: transparent; letter-spacing: .1px;
   }
   #input::placeholder { color: #b4bacb; }
-  .composer-bar { display: flex; align-items: center; margin-top: 9px; }
+  .composer-bar { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+  #mode-sel {
+    border: 1px solid rgba(139,92,246,.32); background: #fff; color: #5b6178;
+    border-radius: 9px; padding: 6px 10px; font-size: 12.5px; outline: none;
+    cursor: pointer; font-family: inherit;
+  }
+  #mode-sel:hover, #mode-sel:focus { border-color: var(--primary); color: var(--primary); }
   #send {
     margin-left: auto; border: none; border-radius: 11px; padding: 8.5px 26px;
     font-size: 13.5px; font-weight: 650; color: #fff; cursor: pointer; letter-spacing: 1px;
@@ -580,13 +586,19 @@
   <div class="composer-wrap">
     <div class="composer-inner">
       <div id="current-entity">
-        <span>当前分析对象：</span><b id="current-entity-name"></b>
+        <span id="ce-label">当前分析对象：</span><b id="current-entity-name"></b>
         <button class="ce-act" id="ce-change" title="输入其他业务名称重新分析">更换</button>
         <button class="ce-act ce-clear" id="ce-clear" title="清除当前分析对象">清除</button>
       </div>
       <div class="composer">
         <textarea id="input" rows="1" placeholder="例如：我打算把 customer 表的 customer_name 字段长度从 50 改到 200…"></textarea>
         <div class="composer-bar">
+          <select id="mode-sel" title="处理模式：自动优先衔接业务分析；手动选择优先级最高">
+            <option value="auto">自动</option>
+            <option value="analysis">业务分析</option>
+            <option value="qa">智能问答</option>
+            <option value="writing">智能写作</option>
+          </select>
           <button id="send">发 送</button>
         </div>
       </div>
@@ -802,7 +814,11 @@ async function send(text) {
     const resp = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: text, conversation_id: conversationId }),
+      body: JSON.stringify({
+        query: text,
+        conversation_id: conversationId,
+        mode: (document.getElementById('mode-sel') || {}).value || 'auto',
+      }),
       signal: currentAbort.signal,
     });
 
@@ -1050,20 +1066,34 @@ function renderAssistantFinal(bubble, text, graphCard) {
   scrollBottom();
 }
 
-// ====================== 当前分析对象条（输入框上方，不随对话滚走） ======================
+// ====================== 当前分析对象条（随模式场景变化） ======================
+let currentEntity = null;   // 已选分析对象（问答/独立写作时仅隐藏展示，不删除）
 function setCurrentEntity(ent) {
-  const box = document.getElementById('current-entity');
-  if (!ent || ent.id == null) { box.classList.remove('show'); return; }
-  document.getElementById('current-entity-name').textContent = ent.name || ('ID ' + ent.id);
-  box.classList.add('show');
-  box.dataset.entity = JSON.stringify(ent);
+  currentEntity = (ent && ent.id != null) ? ent : null;
+  updateEntityBar();
 }
+function updateEntityBar() {
+  const box = document.getElementById('current-entity');
+  const label = document.getElementById('ce-label');
+  const nameEl = document.getElementById('current-entity-name');
+  const mode = (document.getElementById('mode-sel') || {}).value || 'auto';
+  if (!currentEntity || mode === 'qa') { box.classList.remove('show'); return; }
+  if (mode === 'writing') {
+    // 基于分析写作：显示写作素材；独立写作（无分析对象）保持隐藏
+    label.textContent = '写作素材：本次业务分析';
+  } else {
+    label.textContent = '当前分析对象：';
+  }
+  nameEl.textContent = currentEntity.name || ('ID ' + currentEntity.id);
+  box.classList.add('show');
+}
+document.getElementById('mode-sel').addEventListener('change', updateEntityBar);
 document.getElementById('ce-change').addEventListener('click', () => {
   // 更换分析对象：跳到图谱工作台，搜索/点选业务后用"以此业务继续分析"带回对话
   if (window.GW) GW.open();
 });
 document.getElementById('ce-clear').addEventListener('click', () => {
-  document.getElementById('current-entity').classList.remove('show');
+  setCurrentEntity(null);
   if (conversationId) fetch('/sessions/' + encodeURIComponent(conversationId) + '/turns', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: null }),
@@ -1201,7 +1231,8 @@ async function openConversation(id) {
   markActive();
   const inner = document.querySelector('.chat-inner');
   inner.innerHTML = '';
-  document.getElementById('current-entity').classList.remove('show');
+  document.getElementById('mode-sel').value = 'auto';
+  setCurrentEntity(null);
   let lastGraph = null, firstName = '';
   try {
     const r = await fetch('/api/messages?conversation_id=' + encodeURIComponent(id));
@@ -1232,7 +1263,8 @@ function newChat() {
   const inner = document.querySelector('.chat-inner');
   inner.innerHTML = HERO_HTML;
   markActive();
-  document.getElementById('current-entity').classList.remove('show');
+  document.getElementById('mode-sel').value = 'auto';   // 新对话恢复自动模式
+  setCurrentEntity(null);
   setConvTitle('影响分析对话');
   inputEl.focus();
 }

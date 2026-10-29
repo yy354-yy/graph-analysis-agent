@@ -269,6 +269,9 @@ def chat():
     data = request.get_json(silent=True) or {}
     query = (data.get("query") or u"").strip()
     conv_id = data.get("conversation_id") or u""
+    mode = (data.get("mode") or u"auto").strip().lower()
+    if mode not in (u"auto", u"analysis", u"qa", u"writing"):
+        mode = u"auto"
     if not query:
         return jsonify({"error": u"消息不能为空"}), 400
 
@@ -294,7 +297,7 @@ def chat():
         graph_card = {}    # 本条回答的图谱卡片（每条消息存最后一张）
         has_error = False
         try:
-            for item in pipeline.run_pipeline(query, conv_id):
+            for item in pipeline.run_pipeline(query, conv_id, mode):
                 if isinstance(item, tuple):
                     kind, content = item
                 else:
