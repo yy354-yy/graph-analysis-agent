@@ -1,0 +1,24 @@
+# 业务变更影响分析编排服务 systemd 单元
+# 安装（目标机，按实际部署路径改下面的 /opt/graphagent）：
+#   cp orchestrator2.0/fia-orchestrator.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now fia-orchestrator
+# 常用命令：
+#   systemctl status fia-orchestrator      # 状态
+#   journalctl -u fia-orchestrator -f      # 看日志
+#   systemctl restart fia-orchestrator     # 重启（改完 orchestrator2.0 代码后）
+[Unit]
+Description=Field Impact Analysis Orchestrator (port 5200)
+After=network.target
+
+[Service]
+Type=simple
+# 按实际部署路径修改
+WorkingDirectory=/opt/graphagent
+ExecStart=/bin/sh /opt/graphagent/start.sh
+Restart=always
+RestartSec=5
+# 日志走 journalctl；如需文件日志可加 StandardOutput=append:/var/log/fia.log
+
+[Install]
+WantedBy=multi-user.target
