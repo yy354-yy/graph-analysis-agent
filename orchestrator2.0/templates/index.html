@@ -394,15 +394,23 @@
   }
   #input::placeholder { color: #b4bacb; }
   .composer-bar { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
+  /* 选择器字体与正文完全一致（原生 select/option 各有自己的默认字体，
+     必须显式写字体栈+字重+字距，否则渲染出来偏"硬"） */
+  #mode-sel, #mode-sel option {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC",
+                 "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    font-weight: 400; letter-spacing: .1px;
+    -webkit-font-smoothing: antialiased;
+  }
   #mode-sel {
     border: 1px solid rgba(139,92,246,.32); background: #fff; color: var(--text);
     border-radius: 9px; padding: 6px 10px; font-size: 14px; outline: none;
-    cursor: pointer; font-family: inherit;
+    cursor: pointer;
   }
   #mode-sel:hover, #mode-sel:focus { border-color: var(--primary); }
   /* 替换原生蓝色选中：选项白底深灰字，选中/悬停用浅紫底+紫字 */
   #mode-sel option {
-    font-family: inherit; font-size: 14px; background: #fff; color: #333;
+    font-size: 14px; background: #fff; color: #333;
     border: none; outline: none;
   }
   #mode-sel option:checked,
