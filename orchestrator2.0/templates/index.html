@@ -395,11 +395,18 @@
   #input::placeholder { color: #b4bacb; }
   .composer-bar { display: flex; align-items: center; gap: 10px; margin-top: 9px; }
   #mode-sel {
-    border: 1px solid rgba(139,92,246,.32); background: #fff; color: #5b6178;
-    border-radius: 9px; padding: 6px 10px; font-size: 12.5px; outline: none;
+    border: 1px solid rgba(139,92,246,.32); background: #fff; color: var(--text);
+    border-radius: 9px; padding: 6px 10px; font-size: 14px; outline: none;
     cursor: pointer; font-family: inherit;
   }
-  #mode-sel:hover, #mode-sel:focus { border-color: var(--primary); color: var(--primary); }
+  #mode-sel:hover, #mode-sel:focus { border-color: var(--primary); }
+  /* 替换原生蓝色选中：选项白底深灰字，选中/悬停用浅紫底+紫字 */
+  #mode-sel option {
+    font-family: inherit; font-size: 14px; background: #fff; color: #333;
+    border: none; outline: none;
+  }
+  #mode-sel option:checked,
+  #mode-sel option:hover { background: #eef2ff; color: #4c54c4; }
   #send {
     margin-left: auto; border: none; border-radius: 11px; padding: 8.5px 26px;
     font-size: 13.5px; font-weight: 650; color: #fff; cursor: pointer; letter-spacing: 1px;
