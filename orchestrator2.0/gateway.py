@@ -136,6 +136,7 @@ DEFAULT_NOTES_PATH = os.path.join(SCHEMA_NOTES_DIR, "schema_notes.json")
 # 全部从这里读；换图时在 schema_notes 的 core_semantics 段覆盖即可。
 DEFAULT_CORE_SEMANTICS = {
     u"anchor_label": u"业务事项",        # 锚定实体类型（候选搜索/归并/依赖传播中心）
+    u"dependency_enabled": True,          # 图中没有明确依赖边时可显式关闭传播推理
     u"dependency_rel": u"业务依赖",      # 影响传播关系（A -[rel]-> B = A 依赖 B）
     u"dependency_depth": 6,              # 依赖传播变长路径深度
     u"hosting_rel": u"承载于",           # 业务 -> 承载系统 关系
@@ -209,6 +210,10 @@ def core_semantics():
         for k, v in ov.items():
             if v is not None and v != u"":
                 sem[k] = v
+    # dependency_rel 的空值过去会回退成默认“业务依赖”，导致没有依赖边的图
+    # 仍然执行虚假的传播推理。用独立开关表达“此图没有依赖语义”。
+    if sem.get("dependency_enabled") is False:
+        sem["dependency_rel"] = u""
     return sem
 
 
@@ -265,7 +270,14 @@ def guess_core_semantics(schema):
             dep = rn
             break
     if not dep:
-        dep = pick(relnames, (u"依赖", u"引用", u"调用"), u"依赖传播关系", must=False)
+        # 允许名称匹配但端点不是锚定类型的关系作为人工校对候选；完全没有
+        # 依赖语义时必须禁用传播，不能拿关系列表第一项冒充依赖关系。
+        dep = next((rn for rn in relnames
+                    if any(k in rn for k in (u"依赖", u"引用", u"调用"))), u"")
+    dependency_enabled = bool(dep)
+    if not dependency_enabled:
+        warnings.append(u"依赖传播关系：未找到名称含“依赖/引用/调用”的关系，"
+                        u"已禁用依赖传播；结构关系仍可用于关联分析")
     hosting = pick(relnames, (u"承载", u"部署", u"运行", u"落户"), u"承载关系", must=False)
     system = pick(labels, (u"系统", u"平台", u"应用"), u"承载系统类型", must=False)
     name_prop = u""
@@ -295,6 +307,7 @@ def guess_core_semantics(schema):
             excl.append(r)
     sem = {
         u"anchor_label": anchor,
+        u"dependency_enabled": dependency_enabled,
         u"dependency_rel": dep,
         u"dependency_depth": 6,
         u"hosting_rel": hosting,
@@ -337,7 +350,8 @@ def write_notes_skeleton(schema, graph=None):
             })
     # 锚定类型补依赖传播角色（有依赖关系时），其余类型留给人工标注
     entity_roles = {}
-    if sem.get("anchor_label") and sem.get("dependency_rel"):
+    if (sem.get("anchor_label") and sem.get("dependency_enabled")
+            and sem.get("dependency_rel")):
         entity_roles[sem["anchor_label"]] = {
             u"propagate": [{u"rel": sem[u"dependency_rel"],
                             u"depth": sem[u"dependency_depth"],

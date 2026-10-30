@@ -199,9 +199,8 @@ def business_search(keyword, filters=None, labels=None, limit=20):
     return results[:limit]
 
 
-def fuzzy_search(keyword, limit=5):
-    """精确搜索 0 结果时的兜底：用关键词的 2 字滑窗逐个搜索，合并去重。
-    '开办业务' -> '开办'/'办业'/'业务'，能命中'企业开办一件事'。"""
+def fuzzy_search(keyword, limit=5, labels=None):
+    """精确搜索无结果时的分层模糊兜底；结果只作为候选，不直接当结论。"""
     kw = (keyword or u"").strip()
     if len(kw) < 3:
         return []
@@ -212,8 +211,7 @@ def fuzzy_search(keyword, limit=5):
             grams.append(g)
     merged = {}
     for g in grams:
-        for c in business_search(g, labels=(core_sem().get("candidate_labels")
-                                            or config.CANDIDATE_LABELS),
+        for c in business_search(g, labels=labels,
                                  limit=limit * 3):
             key = (_text(c.get("business_type")), _text(c.get("id")))
             if key not in merged:
@@ -222,10 +220,33 @@ def fuzzy_search(keyword, limit=5):
                 merged[key] = c
             else:
                 merged[key]["_grams"] += 1
-    ranked = sorted(merged.values(),
-                    key=lambda c: (-c.get("_grams", 0), len(_text(c.get("name")))))
+    # 用户口语/错别字可能没有连续二字片段（如“卫证规则”）。仅在二字
+    # 窗口完全无命中时，退化为单字交集检索；至少命中两个不同字符才保留，
+    # 防止“的/业/务”等高频字把全图候选刷满。
+    if not merged and len(set(kw)) >= 2:
+        chars = []
+        for ch in kw:
+            if ch not in chars:
+                chars.append(ch)
+        for ch in chars:
+            for c in business_search(ch, labels=labels, limit=limit * 2):
+                key = (_text(c.get("business_type")), _text(c.get("id")))
+                if key not in merged:
+                    c = dict(c)
+                    c["_grams"] = 1
+                    c["_char_hits"] = set([ch])
+                    merged[key] = c
+                else:
+                    merged[key].setdefault("_char_hits", set()).add(ch)
+                    merged[key]["_grams"] = len(merged[key]["_char_hits"])
+        merged = {k: v for k, v in merged.items() if v.get("_grams", 0) >= 2}
+    ranked = sorted(merged.values(), key=lambda c: (
+        0 if kw.lower() in _text(c.get("name")).lower() else 1,
+        -c.get("_grams", 0), len(_text(c.get("name"))),
+        _text(c.get("business_type"))))
     for c in ranked:
         c.pop("_grams", None)
+        c.pop("_char_hits", None)
     return ranked[:limit]
 
 
@@ -291,6 +312,46 @@ def data_overview():
                 len(nodes), total, u"\n".join(nodes), rels))
 
 
+def node_type_overview():
+    """按官方 Schema 确定性回答节点类型问题。
+
+    Schema 类型数和 MATCH (n) 能观察到的非空标签数是两个口径；必须同时说明，
+    避免把尚无实例的合法类型从模型定义中漏掉。
+    """
+    data, err = gateway.build_schema()
+    if err:
+        return u"读取图 Schema 失败：{}".format(err)
+    types = data.get("node_types") or []
+    populated = [n for n in types if isinstance(n.get("count"), int)
+                 and n.get("count") > 0]
+    empty = [n for n in types if n.get("count") == 0]
+    unknown = [n for n in types if n.get("count") is None]
+    total_nodes = sum(n.get("count") for n in populated)
+
+    def names(items, with_count=False):
+        if with_count:
+            return u"、".join(u"{}（{}个）".format(n.get("name"), n.get("count"))
+                             for n in items)
+        return u"、".join(_text(n.get("name")) for n in items)
+
+    populated_line = (u"- 有数据（{}种）：{}".format(
+        len(populated), names(populated, with_count=True))
+        if populated else u"- 有数据（0种）：无")
+    empty_line = (u"- 暂无实例（{}种）：{}".format(len(empty), names(empty))
+                  if empty else u"- 暂无实例（0种）：无")
+    lines = [
+        u"Galaxybase Schema 共定义 **{} 种点类型**；其中 **{} 种当前有节点数据**，"
+        u"合计 **{} 个节点**。".format(len(types), len(populated), total_nodes),
+        populated_line,
+        empty_line,
+    ]
+    if unknown:
+        lines.append(u"- 数量未获取（{}种）：{}".format(len(unknown), names(unknown)))
+    lines.append(u"之前回答的“6种”是只统计了当前非空标签；按 Schema 口径应为 **{}种**。"
+                 .format(len(types)))
+    return u"\n".join(lines) + u"\n"
+
+
 # ---------------- 实体类型参数表（结构自动 + 语义标注） ----------------
 _reg_cache = {"data": None, "ts": 0}
 
@@ -315,6 +376,7 @@ def type_registry():
     if not err:
         notes = gateway.load_schema_notes()
         roles = notes.get("entity_roles") or {}
+        name_props = notes.get("name_properties") or {}
         in_rels = {}
         for rt in data.get("relationship_types") or []:
             name = rt.get("name")
@@ -326,11 +388,15 @@ def type_registry():
         for nt in data.get("node_types") or []:
             label = nt.get("name")
             r = roles.get(label) or {}
+            np_cfg = name_props.get(label) or {}
             reg[label] = {
                 "label": label,
                 "pk": nt.get("unique_key") or u"名称",
+                "name_prop": (np_cfg.get("name") if isinstance(np_cfg, dict) else None)
+                             or u"名称",
                 "propagate": r.get("propagate") or [],
                 "compose": r.get("compose"),
+                "rollup": r.get("rollup") or [],
                 "in_rels": sorted(set(in_rels.get(label) or [])),
             }
     _reg_cache["data"] = reg
@@ -354,17 +420,46 @@ def _run_evidence(segs):
         r = graph_query(stmt, params)
         if not r.get("success"):
             return None, u"证据查询失败：{}".format(r.get("error"))
-        rows.extend(r.get("rows") or [])
+        rows.extend(x for x in (r.get("rows") or []) if _text(x.get("rel")).strip())
     seen = set()
     dedup = []
     for r in rows:
         key = (_text(r.get("src")), _text(r.get("rel")),
                _text(r.get("dir")), _text(r.get("nb_type")),
-               _text(r.get("nb_name")))
+               _text(r.get("nb_name")), _text(r.get("role")))
         if key not in seen:
             seen.add(key)
             dedup.append(r)
     return dedup, None
+
+
+def _name_expr(var, reg=None):
+    """按图配置生成跨类型名称表达式，避免对所有节点硬套“名称”属性。"""
+    reg = reg or type_registry()
+    props = []
+    for ent in reg.values():
+        p = _text(ent.get("name_prop")).strip()
+        if p and p not in props:
+            props.append(p)
+    if u"名称" not in props:
+        props.append(u"名称")
+    return u"coalesce({})".format(
+        u",".join(u"{}.`{}`".format(var, p) for p in props) + u",''")
+
+
+def _compose_entries(compose):
+    if isinstance(compose, dict):
+        return [compose]
+    return [c for c in (compose or []) if isinstance(c, dict)]
+
+
+def _rollup_paths(rollup):
+    """归一化为路径列表；单条路径是 [{segment}, ...]，也支持多条备选路径。"""
+    if not isinstance(rollup, list) or not rollup:
+        return []
+    if isinstance(rollup[0], dict):
+        return [rollup]
+    return [p for p in rollup if isinstance(p, list) and p]
 
 
 def dependent_systems(names):
@@ -405,19 +500,17 @@ def evidence_rows(entity_type, biz_id):
     ent = entity_entry(entity_type)
     label = ent.get("label") or anchor
     pk = ent.get("pk") or np_
-    prop_rels = set(_text(p.get("rel")) for p in (ent.get("propagate") or []))
+    current_np = ent.get("name_prop") or np_
+    reg = type_registry()
+    nb_name_expr = _name_expr(u"nb", reg)
 
     segs = []
-    # 传播入边关系内联（值来自 schema_notes 配置，无注入风险；列表参数兼容性不确定）
-    excl = u"[" + u",".join(u"'{}'".format(r) for r in sorted(prop_rels)) + u"]" \
-        if prop_rels else u"['__none__']"
     seg1 = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id "
             u"OPTIONAL MATCH (x)-[r1]-(nb) "
-            u"WHERE NOT (type(r1) IN {ex} AND startNode(r1) = nb) "
             u"RETURN x.`{np}` AS src, type(r1) AS rel, "
             u"CASE WHEN startNode(r1) = x THEN '出边' ELSE '入边' END AS dir, "
-            u"labels(nb)[0] AS nb_type, coalesce(nb.`{np}`,'') AS nb_name LIMIT 200"
-            ).format(l=label, pk=pk, np=np_, ex=excl)
+            u"labels(nb)[0] AS nb_type, {nbn} AS nb_name LIMIT 200"
+            ).format(l=label, pk=pk, np=current_np, nbn=nb_name_expr)
     segs.append((seg1, {"id": id_}))
 
     cypher_notes = []
@@ -426,54 +519,111 @@ def evidence_rows(entity_type, biz_id):
         depth = p.get("depth") or 1
         if not rel:
             continue
-        seg2 = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id "
-                u"MATCH (a)-[:`{r}`*1..{d}]->(x) "
-                u"RETURN DISTINCT a.`{np}` AS src, '{r}' AS rel, '入边' AS dir, "
-                u"labels(a)[0] AS nb_type, x.`{np}` AS nb_name LIMIT 200"
-                ).format(l=label, pk=pk, np=np_, r=rel, d=int(depth))
+        other_label = _text(p.get("label")).strip()
+        other_ent = reg.get(other_label) or {}
+        other_np = other_ent.get("name_prop") or np_
+        typed_a = u":`{}`".format(other_label) if other_label else u""
+        direction = _text(p.get("direction") or u"in").lower()
+        if direction == u"out":
+            pattern = u"(x)-[:`{}`*1..{}]->(a{})".format(rel, int(depth), typed_a)
+            shown_dir = u"出边"
+        else:
+            pattern = u"(a{})-[:`{}`*1..{}]->(x)".format(typed_a, rel, int(depth))
+            shown_dir = u"入边"
+        role = _text(p.get("role") or rel).replace(u"'", u"")
+        if dep_rel and rel == dep_rel:
+            # 兼容既有依赖分析：src 保持为依赖候选，供直接/间接分桶使用。
+            src_expr, nb_expr = u"a.`{}`".format(other_np), u"x.`{}`".format(current_np)
+        else:
+            # 普通关联证据统一按“当前节点 --关系--> 邻居”表达，方向与 src 一致。
+            src_expr, nb_expr = u"x.`{}`".format(current_np), u"a.`{}`".format(other_np)
+        seg2 = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id MATCH {pattern} "
+                u"RETURN DISTINCT {src} AS src, '{r}' AS rel, '{dr}' AS dir, "
+                u"labels(a)[0] AS nb_type, {nb} AS nb_name, '{role}' AS role LIMIT 200"
+                ).format(l=label, pk=pk, pattern=pattern, src=src_expr,
+                         r=rel, dr=shown_dir, nb=nb_expr, role=role)
         segs.append((seg2, {"id": id_}))
-        cypher_notes.append(u"-- 传播入边 {} *1..{} ({})".format(
-            rel, depth, p.get("role") or u""))
+        cypher_notes.append(u"-- 关联{} {} *1..{} ({})".format(
+            shown_dir, rel, depth, p.get("role") or u""))
 
-    comp = ent.get("compose") or {}
-    if comp.get("rel") and comp.get("child"):
+    for comp in _compose_entries(ent.get("compose")):
+        if not (comp.get("rel") and comp.get("child")):
+            continue
+        child_ent = reg.get(comp["child"]) or {}
+        child_np = child_ent.get("name_prop") or np_
+        nb3_name_expr = _name_expr(u"nb3", reg)
         seg3 = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id "
                 u"MATCH (x)-[:`{cr}`]->(s:`{cl}`) "
                 u"OPTIONAL MATCH (s)-[r3]-(nb3) WHERE NOT (nb3 = x) "
-                u"RETURN s.`{np}` AS src, type(r3) AS rel, "
+                u"RETURN s.`{snp}` AS src, type(r3) AS rel, "
                 u"CASE WHEN startNode(r3) = s THEN '出边' ELSE '入边' END AS dir, "
-                u"labels(nb3)[0] AS nb_type, coalesce(nb3.`{np}`,'') AS nb_name LIMIT 200"
-                ).format(l=label, pk=pk, np=np_, cr=comp["rel"], cl=comp["child"])
+                u"labels(nb3)[0] AS nb_type, {nbn} AS nb_name LIMIT 200"
+                ).format(l=label, pk=pk, snp=child_np, cr=comp["rel"],
+                         cl=comp["child"], nbn=nb3_name_expr)
         segs.append((seg3, {"id": id_}))
 
     rows, err = _run_evidence(segs)
     if err:
         return None, err, []
 
-    # ---- 非锚定实体：归并到锚定类型，再跑依赖关系传播 ----
+    # ---- 非锚定实体：先按显式结构路径归并到锚定类型；存在依赖边时再传播 ----
     rollup_bizs = []
-    if label != anchor and dep_rel:
+    if label != anchor:
+        roll_rows = []
+        for path in _rollup_paths(ent.get("rollup")):
+            pattern = u"(x)"
+            valid = True
+            for i, step in enumerate(path):
+                rel = _text(step.get("rel")).strip()
+                target = _text(step.get("label")).strip()
+                if not rel or not target:
+                    valid = False
+                    break
+                node = u"v{}".format(i)
+                if _text(step.get("direction") or u"out").lower() == u"in":
+                    pattern += u"<-[:`{}`]-({}:`{}`)".format(rel, node, target)
+                else:
+                    pattern += u"-[:`{}`]->({}:`{}`)".format(rel, node, target)
+            if not valid or not path:
+                continue
+            final = u"v{}".format(len(path) - 1)
+            anchor_np = (reg.get(anchor) or {}).get("name_prop") or np_
+            seg_roll = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id MATCH {path} "
+                        u"RETURN DISTINCT x.`{xnp}` AS src, '归属业务' AS rel, "
+                        u"'入边' AS dir, '{a}' AS nb_type, {b}.`{anp}` AS nb_name LIMIT 50"
+                        ).format(l=label, pk=pk, path=pattern, xnp=current_np,
+                                 a=anchor, b=final, anp=anchor_np)
+            rr = graph_query(seg_roll, {"id": id_})
+            if not rr.get("success"):
+                return None, u"归并查询失败：{}".format(rr.get("error")), []
+            roll_rows.extend(rr.get("rows") or [])
+
+        # 兼容既有图：没有显式 rollup 时，只有配置了依赖传播才使用旧的无向归并。
+        if not _rollup_paths(ent.get("rollup")) and dep_rel:
         # 只走结构性归属链（排除依赖/协同等协作关系，避免把依赖邻居误判为归属）
-        excl_rels = sem.get("rollup_exclude_rels") or [dep_rel]
-        excl2 = u"[" + u",".join(u"'{}'".format(r) for r in excl_rels) + u"]"
-        depth = int(sem.get("dependency_depth") or 6)
-        seg_roll = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id "
-                    u"MATCH (x)-[rs*1..3]-(b:`{a}`) "
-                    u"WHERE ALL(r IN rs WHERE NOT type(r) IN {ex}) "
-                    u"RETURN DISTINCT x.`{np}` AS src, '归属业务' AS rel, '入边' AS dir, "
-                    u"'{a}' AS nb_type, b.`{np}` AS nb_name LIMIT 50"
-                    ).format(l=label, pk=pk, np=np_, a=anchor, ex=excl2)
-        r = graph_query(seg_roll, {"id": id_})
-        if not r.get("success"):
-            return None, u"归并查询失败：{}".format(r.get("error")), []
-        rows.extend(r.get("rows") or [])
+            excl_rels = sem.get("rollup_exclude_rels") or [dep_rel]
+            excl2 = u"[" + u",".join(u"'{}'".format(r) for r in excl_rels) + u"]"
+            seg_roll = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id "
+                        u"MATCH (x)-[rs*1..3]-(b:`{a}`) "
+                        u"WHERE ALL(r IN rs WHERE NOT type(r) IN {ex}) "
+                        u"RETURN DISTINCT x.`{xnp}` AS src, '归属业务' AS rel, '入边' AS dir, "
+                        u"'{a}' AS nb_type, b.`{anp}` AS nb_name LIMIT 50"
+                        ).format(l=label, pk=pk, xnp=current_np, a=anchor,
+                                 anp=(reg.get(anchor) or {}).get("name_prop") or np_, ex=excl2)
+            rr = graph_query(seg_roll, {"id": id_})
+            if not rr.get("success"):
+                return None, u"归并查询失败：{}".format(rr.get("error")), []
+            roll_rows.extend(rr.get("rows") or [])
+
+        rows.extend(roll_rows)
         seen_biz = []
-        for row in r.get("rows") or []:
+        for row in roll_rows:
             n = _text(row.get("nb_name"))
             if n and n not in seen_biz:
                 seen_biz.append(n)
         rollup_bizs = seen_biz     # 归并出的全部归属业务（seg_roll 已 LIMIT 50）
-        if rollup_bizs:
+        if rollup_bizs and dep_rel:
+            depth = int(sem.get("dependency_depth") or 6)
             # 批量依赖传播（对全部归属业务一次查完，替代逐业务循环）：
             # 直接（1跳）与变长各一条，按 (依赖方, 归属业务) 对区分直接/间接
             bns = {u"bns": rollup_bizs}
@@ -500,19 +650,28 @@ def evidence_rows(entity_type, biz_id):
                                  u"dir": u"入边", u"nb_type": anchor,
                                  u"nb_name": pair[1], u"hop": u"间接"})
         if rollup_bizs:
-            cypher_notes.append(u"-- 非锚定实体已归并到{}（{}，最多 50 个）并跑 {} 依赖传播".format(
-                anchor, u"、".join(rollup_bizs), dep_rel))
+            suffix = u"并执行 {} 依赖传播".format(dep_rel) if dep_rel else u"（未配置依赖传播）"
+            cypher_notes.append(u"-- 非锚定实体已归并到{}（{}，最多 50 个）{}".format(
+                anchor, u"、".join(rollup_bizs), suffix))
 
     # 变长路径可能按路径展开出重复行（含同名不同ID的节点），按 关系+方向+邻居名 去重
     seen = set()
     dedup = []
+    positions = {}
     for r in rows:
         key = (_text(r.get("src")), _text(r.get("rel")),
                _text(r.get("dir")), _text(r.get("nb_type")),
                _text(r.get("nb_name")), _text(r.get("hop")))
-        if key not in seen:
-            seen.add(key)
-            dedup.append(r)
+        if key in seen:
+            # 同一条 1 跳边既来自通用邻接又来自角色查询时，保留带角色标记的行，
+            # 供上层稳定分组，同时避免把同一证据重复交给模型。
+            pos = positions[key]
+            if r.get("role") and not dedup[pos].get("role"):
+                dedup[pos] = r
+            continue
+        seen.add(key)
+        positions[key] = len(dedup)
+        dedup.append(r)
     return dedup, u"\n".join(cypher_notes), rollup_bizs
 
 
@@ -523,6 +682,9 @@ def fact_rows(entity_type, ids):
     np_ = core_sem().get("name_prop") or u"名称"
     label = ent.get("label") or core_sem().get("anchor_label") or u"业务事项"
     pk = ent.get("pk") or np_
+    current_np = ent.get("name_prop") or np_
+    reg = type_registry()
+    nb_name_expr = _name_expr(u"nb", reg)
     ids = [i for i in ids if _text(i).strip()][:10]
     if not ids:
         return []
@@ -531,18 +693,21 @@ def fact_rows(entity_type, ids):
              u"OPTIONAL MATCH (x)-[r]-(nb) "
              u"RETURN x.`{np}` AS biz, type(r) AS rel, "
              u"CASE WHEN startNode(r) = x THEN '出边' ELSE '入边' END AS dir, "
-             u"labels(nb)[0] AS nb_type, coalesce(nb.`{np}`,'') AS nb_name "
-             u"LIMIT 200").format(l=label, pk=pk, np=np_)
+             u"labels(nb)[0] AS nb_type, {nbn} AS nb_name "
+             u"LIMIT 200").format(l=label, pk=pk, np=current_np, nbn=nb_name_expr)
     segs.append((stmt1, {"ids": ids}))
-    comp = ent.get("compose") or {}
-    if comp.get("rel") and comp.get("child"):
+    for comp in _compose_entries(ent.get("compose")):
+        if not (comp.get("rel") and comp.get("child")):
+            continue
+        nb2_name_expr = _name_expr(u"nb2", reg)
         stmt2 = (u"MATCH (x:`{l}`) WHERE x.`{pk}` IN $ids "
                  u"MATCH (x)-[:`{cr}`]->(s:`{cl}`) "
                  u"OPTIONAL MATCH (s)-[r2]-(nb2) "
                  u"RETURN x.`{np}` AS biz, type(r2) AS rel, "
                  u"CASE WHEN startNode(r2) = s THEN '出边' ELSE '入边' END AS dir, "
-                 u"labels(nb2)[0] AS nb_type, coalesce(nb2.`{np}`,'') AS nb_name "
-                 u"LIMIT 200").format(l=label, pk=pk, np=np_, cr=comp["rel"], cl=comp["child"])
+                 u"labels(nb2)[0] AS nb_type, {nbn} AS nb_name "
+                 u"LIMIT 200").format(l=label, pk=pk, np=current_np,
+                                      cr=comp["rel"], cl=comp["child"], nbn=nb2_name_expr)
         segs.append((stmt2, {"ids": ids}))
     rows = []
     for stmt, params in segs:
@@ -582,12 +747,15 @@ def neighbors_graph(entity_type, entity_id, limit=100):
     np_ = sem.get("name_prop") or u"名称"
     label = ent.get("label") or sem.get("anchor_label") or u"业务事项"
     pk = ent.get("pk") or np_
+    current_np = ent.get("name_prop") or np_
+    nb_name_expr = _name_expr(u"nb")
     stmt = (u"MATCH (x:`{l}`) WHERE x.`{pk}` = $id OR x.`{np}` = $id "
             u"OPTIONAL MATCH (x)-[r]-(nb) "
             u"RETURN x.`{np}` AS cnm, labels(nb)[0] AS t, nb.`{pk}` AS pid, "
-            u"coalesce(nb.`{np}`,'') AS nm, type(r) AS rel, "
+            u"{nbn} AS nm, type(r) AS rel, "
             u"CASE WHEN startNode(r) = x THEN '出边' ELSE '入边' END AS dir "
-            u"LIMIT {n}").format(l=label, pk=pk, np=np_, n=limit + 1)
+            u"LIMIT {n}").format(l=label, pk=pk, np=current_np,
+                                  nbn=nb_name_expr, n=limit + 1)
     r = graph_query(stmt, {"id": id_})
     if not r.get("success"):
         return {"success": False, "error": r.get("error")}

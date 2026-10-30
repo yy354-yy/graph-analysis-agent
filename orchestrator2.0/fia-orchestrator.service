@@ -1,5 +1,5 @@
 # 业务变更影响分析编排服务 systemd 单元
-# 安装（目标机，按实际部署路径改下面的 /opt/graphagent）：
+# 安装：
 #   cp orchestrator2.0/fia-orchestrator.service /etc/systemd/system/
 #   systemctl daemon-reload
 #   systemctl enable --now fia-orchestrator
@@ -13,9 +13,8 @@ After=network.target
 
 [Service]
 Type=simple
-# 按实际部署路径修改
-WorkingDirectory=/opt/graphagent
-ExecStart=/bin/sh /opt/graphagent/start.sh
+WorkingDirectory=/opt/graph-analysis-agent-main/orchestrator2.0
+ExecStart=/usr/bin/python2 /opt/graph-analysis-agent-main/orchestrator2.0/server.py
 Restart=always
 RestartSec=5
 # 日志走 journalctl；如需文件日志可加 StandardOutput=append:/var/log/fia.log

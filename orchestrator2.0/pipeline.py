@@ -43,6 +43,9 @@ _TRAIL_RE = re.compile(u"(的变更|变更|变化|修改|调整|的影响|影响
 _COUNT_Q_RE = re.compile(u"(有多少|有多少个|有几个|有几条|多少个|多少家|多少条|总共有|总共多少|数量是|总数)")
 # 追问句式（无业务名的清单跟进，如"具体哪16个"）：靠对话上下文延续话题
 _FOLLOWUP_RE = re.compile(u"(具体哪|具体有哪|哪几个|哪些|列出来|列一下|列个清单|清单|明细|分别是什么|分别有哪|展开说说|展开讲讲)")
+# Schema 元数据问题必须由代码读取官方模型回答，不能用 MATCH (n) 统计非空标签代替。
+_NODE_TYPE_Q_RE = re.compile(u"(点类型|节点类型|节点标签|标签类型)")
+_TYPE_FOLLOWUP_RE = re.compile(u"(哪.{0,4}种|分别.{0,4}(什么|哪些)|列.{0,3}(出|一下|清单))")
 
 
 def clean_keyword(kw):
@@ -135,6 +138,20 @@ def _run(query, conv_id, mode=u"auto"):
     mode = (_text(mode) or u"auto").lower()
     if mode not in _MODES:
         mode = u"auto"
+
+    # “点类型有多少/哪几种”是 Schema 元数据，不交给 LLM 生成 MATCH (n)。
+    # 后者只能看到有实例的标签，会把本图定义的 15 类错误回答成非空的 6 类。
+    recent_history = store.history_text(ctx)
+    asks_node_types = bool(_NODE_TYPE_Q_RE.search(query))
+    follows_node_types = (bool(_TYPE_FOLLOWUP_RE.search(query))
+                          and bool(_NODE_TYPE_Q_RE.search(recent_history)))
+    if mode in (u"auto", u"analysis") and (asks_node_types or follows_node_types):
+        yield ("status", u"正在读取图 Schema…")
+        yield store.node_type_overview()
+        merged = dict(state)
+        merged["task"] = u"analysis"
+        store.save_state(conv_id, merged)
+        return
 
     # ---- 任务域分流：手动模式优先；auto 扩展意图 + 写作续写守卫 ----
     task = u"analysis"
@@ -291,6 +308,24 @@ def _analysis(query, intent, state, ctx, conv_id):
     intent["keyword"] = clean_keyword(intent["keyword"])
     cand_labels = (store.core_sem().get("candidate_labels")
                    or config.CANDIDATE_LABELS)
+
+    # 对象级变更优先：用户常说“修改某对象的业务规则”（如“卫生证书”），
+    # 但该对象会命中多个业务子项。若图中存在唯一的非候选实体精确名称，
+    # 直接以该实体为分析锚点，让 evidence_rows 按配置归并出全部相关业务，
+    # 避免把同一对象拆成多个子项让用户盲选一个。
+    exact_entities = store.business_search(intent["keyword"], labels=None, limit=50)
+    candidate_set = set(cand_labels or [])
+    exact_non_candidates = [c for c in exact_entities
+                            if _text(c.get("name")).strip().lower() ==
+                            _text(intent["keyword"]).strip().lower()
+                            and c.get("business_type") not in candidate_set]
+    if len(exact_non_candidates) == 1:
+        selected = store._norm_selected(exact_non_candidates[0])
+        if selected:
+            for chunk in _analyze(query, intent, selected, ctx, conv_id):
+                yield chunk
+            return
+
     candidates = store.business_search(intent["keyword"],
                                        labels=cand_labels,
                                        limit=config.SEARCH_CANDIDATE_LIMIT)
@@ -300,7 +335,10 @@ def _analysis(query, intent, state, ctx, conv_id):
                                            limit=config.SEARCH_CANDIDATE_LIMIT)
     if len(candidates) == 0:
         # 模糊兜底：2 字滑窗再搜一次，命中则把相近业务列成可选候选
-        fuzzy = store.fuzzy_search(intent["keyword"], limit=config.CANDIDATE_LIMIT)
+        # 分层模糊检索：候选业务无命中后再查全实体类型，优先返回对象/系统/
+        # 部门等更高层节点；用户确认后由 evidence_rows 沿结构路径归并业务。
+        fuzzy = store.fuzzy_search(intent["keyword"], limit=config.CANDIDATE_LIMIT,
+                                   labels=None)
         if fuzzy:
             lines = [u"没有找到与“{}”精确匹配的业务，是不是想找以下业务？请回复序号选择："
                      .format(intent["keyword"])]
@@ -655,17 +693,19 @@ def stream_analysis(query, intent, selected):
     anchor = _text(sem.get("anchor_label")).strip() or u"业务事项"
     np_ = _text(sem.get("name_prop")).strip() or u"名称"
     ent = store.entity_entry(selected.get("type"))
-    role_map = {}
+    role_defs = []
     for p in (ent.get("propagate") or []):
         rel = _text(p.get("rel"))
         if rel and rel != dep_rel:
-            role_map[rel] = _text(p.get("role")) or rel
-    dep_in = [r for r in rows if _text(r.get("rel")) == dep_rel
+            role_defs.append((rel, _text(p.get("role")) or rel,
+                              u"出边" if _text(p.get("direction") or u"in").lower() == u"out"
+                              else u"入边", _text(p.get("label")).strip()))
+    dep_in = [r for r in rows if dep_rel and _text(r.get("rel")) == dep_rel
               and r.get("dir") == u"入边"]
-    dep_out = [r for r in rows if _text(r.get("rel")) == dep_rel
+    dep_out = [r for r in rows if dep_rel and _text(r.get("rel")) == dep_rel
                and r.get("dir") == u"出边"]
     others = [r for r in rows
-              if not (_text(r.get("rel")) == dep_rel)]
+              if not (dep_rel and _text(r.get("rel")) == dep_rel)]
 
     lines = []
     if dep_in:
@@ -715,19 +755,27 @@ def stream_analysis(query, intent, selected):
             lines.extend(dep_line(n, e) for n, e in indirect)
 
     # 实体自身传播入边按角色分组（如：来源子项/承载的业务/主管的业务）
-    for rel, role in role_map.items():
-        group = [r for r in rows if _text(r.get("rel")) == rel and r.get("dir") == u"入边"]
+    for rel, role, direction, other_label in role_defs:
+        group = [r for r in rows if _text(r.get("rel")) == rel
+                 and r.get("dir") == direction
+                 and _text(r.get("role")) == role
+                 and (not other_label or _text(r.get("nb_type")) == other_label)]
         if group:
             lines.append(u"{}（{}，{} 个）：".format(role, rel, len(group)))
-            lines.extend(u"- {}（{}）".format(r.get("src"), r.get("nb_type")) for r in group)
+            lines.extend(u"- {}（{}）".format(r.get("nb_name"), r.get("nb_type"))
+                         for r in group)
 
     if lines:
         impact_text = (u"【受影响与关联候选】（已由系统从图查询按角色精确分组，"
                        u"逐条引用并保留角色标签，不得增删、并组或改判）：\n{}").format(
             u"\n".join(lines))
     else:
-        impact_text = (u"【受影响与关联候选】无——系统已做变长路径（1..6跳）查询，"
-                       u"当前图谱未发现与该对象存在依赖/关联传播的其他对象")
+        if dep_rel:
+            impact_text = (u"【受影响与关联候选】无——系统已执行配置的依赖路径查询，"
+                           u"当前图谱未发现依赖传播候选")
+        else:
+            impact_text = (u"【受影响与关联候选】无——当前 Schema 未定义依赖传播关系；"
+                           u"系统不会把“包括/承载/执行”等结构关系误判为影响传播")
     upstream_text = u"（无）"
     if dep_out:
         upstream_text = u"\n".join(u"- {}（{}）".format(r.get("nb_name"), r.get("nb_type"))
@@ -735,9 +783,10 @@ def stream_analysis(query, intent, selected):
 
     rollup_note = u""
     if rollup_bizs:
-        rollup_note = (u"\n【归属业务】（分析对象经归属链归并到以下业务，"
-                       u"影响面即这些业务的依赖候选）：{}\n".format(
-                           u"、".join(rollup_bizs)))
+        qualifier = (u"后按依赖关系计算影响候选" if dep_rel
+                     else u"；当前仅作为结构归属，不推导跨业务影响")
+        rollup_note = (u"\n【归属业务】（分析对象经配置的结构路径归并到以下业务{}）：{}\n".format(
+                           qualifier, u"、".join(rollup_bizs)))
     schema = store.schema_text()
     analyze_ctx = (u"【用户问题】{}\n【分析的业务】{}{}\n{}\n"
                    u"【上游依赖条件】（被分析业务依赖它们，属前置条件，不是受影响方）：\n{}\n"
