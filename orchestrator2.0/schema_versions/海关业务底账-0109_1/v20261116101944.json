@@ -1,0 +1,771 @@
+{
+  "business_search": [
+    {
+      "display_props": [
+        "名称", 
+        "id~"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": "id~", 
+      "label": "业务事项", 
+      "observed": true, 
+      "search_props": [
+        "名称", 
+        "业务线/业务类型", 
+        "业务编号", 
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称", 
+        "id~"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": "id~", 
+      "label": "业务子项", 
+      "observed": true, 
+      "search_props": [
+        "名称", 
+        "事项简要描述", 
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "事项主管部门/处室", 
+        "id~"
+      ], 
+      "name_prop": "事项主管部门/处室", 
+      "id_prop": "id~", 
+      "label": "主管部门", 
+      "observed": true, 
+      "search_props": [
+        "事项主管部门/处室", 
+        "主办司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "任务名称(节点名称)"
+      ], 
+      "name_prop": "任务名称(节点名称)", 
+      "id_prop": null, 
+      "label": "任务", 
+      "observed": false, 
+      "search_props": [
+        "任务名称(节点名称)", 
+        "智慧海关任务编号"
+      ]
+    }, 
+    {
+      "display_props": [
+        "功能模块名称"
+      ], 
+      "name_prop": "功能模块名称", 
+      "id_prop": null, 
+      "label": "作业", 
+      "observed": false, 
+      "search_props": [
+        "功能模块名称", 
+        "功能模块描述", 
+        "拟建改废应用编号及名称", 
+        "拟建改废系统应用业务主管部门", 
+        "流程/数据节点名称"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": null, 
+      "label": "信息化需求", 
+      "observed": false, 
+      "search_props": [
+        "名称", 
+        "需求描述", 
+        "需求编号"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": null, 
+      "label": "信息系统", 
+      "observed": false, 
+      "search_props": [
+        "名称"
+      ]
+    }, 
+    {
+      "display_props": [
+        "协同业务名称"
+      ], 
+      "name_prop": "协同业务名称", 
+      "id_prop": null, 
+      "label": "协同业务事项", 
+      "observed": false, 
+      "search_props": [
+        "协同业务名称", 
+        "协同业务部门", 
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": null, 
+      "label": "子对象", 
+      "observed": false, 
+      "search_props": [
+        "名称", 
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称", 
+        "id~"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": "id~", 
+      "label": "对象", 
+      "observed": true, 
+      "search_props": [
+        "名称", 
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "应用名称"
+      ], 
+      "name_prop": "应用名称", 
+      "id_prop": null, 
+      "label": "应用", 
+      "observed": false, 
+      "search_props": [
+        "应用名称", 
+        "业务主管部门及负责人", 
+        "业务类别", 
+        "应用名称全路径", 
+        "应用编号", 
+        "运维部门及负责人"
+      ]
+    }, 
+    {
+      "display_props": [
+        "方案名称"
+      ], 
+      "name_prop": "方案名称", 
+      "id_prop": null, 
+      "label": "智慧海关任务", 
+      "observed": false, 
+      "search_props": [
+        "方案名称", 
+        "主办司局", 
+        "任务名称(节点名称)", 
+        "任务描述", 
+        "任务类型", 
+        "协办司局", 
+        "智慧海关任务编号"
+      ]
+    }, 
+    {
+      "display_props": [
+        "司局", 
+        "id~"
+      ], 
+      "name_prop": "司局", 
+      "id_prop": "id~", 
+      "label": "海关部门", 
+      "observed": true, 
+      "search_props": [
+        "司局"
+      ]
+    }, 
+    {
+      "display_props": [
+        "服务对象", 
+        "id~"
+      ], 
+      "name_prop": "服务对象", 
+      "id_prop": "id~", 
+      "label": "相对人", 
+      "observed": true, 
+      "search_props": [
+        "服务对象"
+      ]
+    }, 
+    {
+      "display_props": [
+        "名称"
+      ], 
+      "name_prop": "名称", 
+      "id_prop": null, 
+      "label": "角色岗位", 
+      "observed": false, 
+      "search_props": [
+        "名称", 
+        "司局"
+      ]
+    }
+  ], 
+  "entity_roles": {
+    "主管部门": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "in", 
+          "role": "所属海关部门", 
+          "depth": 1, 
+          "rel": "包括", 
+          "label": "海关部门"
+        }, 
+        {
+          "direction": "out", 
+          "role": "执行业务子项", 
+          "depth": 1, 
+          "rel": "执行", 
+          "label": "业务子项"
+        }
+      ]
+    }, 
+    "对象": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "out", 
+          "role": "权属相对人", 
+          "depth": 1, 
+          "rel": "权属", 
+          "label": "相对人"
+        }, 
+        {
+          "direction": "out", 
+          "role": "隶属业务子项", 
+          "depth": 1, 
+          "rel": "隶属", 
+          "label": "业务子项"
+        }
+      ]
+    }, 
+    "相对人": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "in", 
+          "role": "权属（来自对象）", 
+          "depth": 1, 
+          "rel": "权属", 
+          "label": "对象"
+        }
+      ]
+    }, 
+    "业务事项": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "out", 
+          "role": "包括业务子项", 
+          "depth": 1, 
+          "rel": "包括", 
+          "label": "业务子项"
+        }
+      ]
+    }, 
+    "海关部门": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "out", 
+          "role": "包括主管部门", 
+          "depth": 1, 
+          "rel": "包括", 
+          "label": "主管部门"
+        }
+      ]
+    }, 
+    "业务子项": {
+      "compose": null, 
+      "propagate": [
+        {
+          "direction": "in", 
+          "role": "所属业务事项", 
+          "depth": 1, 
+          "rel": "包括", 
+          "label": "业务事项"
+        }, 
+        {
+          "direction": "in", 
+          "role": "执行（来自主管部门）", 
+          "depth": 1, 
+          "rel": "执行", 
+          "label": "主管部门"
+        }, 
+        {
+          "direction": "in", 
+          "role": "所属对象", 
+          "depth": 1, 
+          "rel": "隶属", 
+          "label": "对象"
+        }
+      ]
+    }
+  }, 
+  "relation_catalog": [
+    {
+      "observed_count": 24, 
+      "verified": true, 
+      "target": "业务子项", 
+      "observed": true, 
+      "source": "业务事项", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": 24, 
+      "verified": true, 
+      "target": "业务子项", 
+      "observed": true, 
+      "source": "主管部门", 
+      "relation": "执行", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": 24, 
+      "verified": true, 
+      "target": "相对人", 
+      "observed": true, 
+      "source": "对象", 
+      "relation": "权属", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": 24, 
+      "verified": true, 
+      "target": "业务子项", 
+      "observed": true, 
+      "source": "对象", 
+      "relation": "隶属", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": 24, 
+      "verified": true, 
+      "target": "主管部门", 
+      "observed": true, 
+      "source": "海关部门", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "业务子项", 
+      "observed": false, 
+      "source": "作业", 
+      "relation": "上位", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "子对象", 
+      "observed": false, 
+      "source": "对象", 
+      "relation": "下位", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "信息系统", 
+      "observed": false, 
+      "source": "角色岗位", 
+      "relation": "使用", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "信息化需求", 
+      "observed": false, 
+      "source": "业务事项", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "智慧海关任务", 
+      "observed": false, 
+      "source": "任务", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "业务事项", 
+      "observed": false, 
+      "source": "任务", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "应用", 
+      "observed": false, 
+      "source": "信息系统", 
+      "relation": "包括", 
+      "rel_props": [], 
+      "semantic_type": "composition", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "协同业务事项", 
+      "observed": false, 
+      "source": "主管部门", 
+      "relation": "协同", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "业务子项", 
+      "observed": false, 
+      "source": "协同业务事项", 
+      "relation": "协同", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "业务子项", 
+      "observed": false, 
+      "source": "信息系统", 
+      "relation": "承载", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "作业", 
+      "observed": false, 
+      "source": "应用", 
+      "relation": "映射", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }, 
+    {
+      "observed_count": null, 
+      "verified": false, 
+      "target": "应用", 
+      "observed": false, 
+      "source": "作业", 
+      "relation": "映射", 
+      "rel_props": [], 
+      "semantic_type": "association", 
+      "dependency_enabled": false
+    }
+  ], 
+  "query_examples": [], 
+  "graph": "海关业务底账-0109_1", 
+  "dependency_paths": [], 
+  "report_headers": {}, 
+  "display_notes": "当前仅支持已确认的结构关系，不代表业务依赖", 
+  "schema_version": "4.1", 
+  "schema_fingerprint": "de2b52a7e6e0b095", 
+  "composition_paths": [], 
+  "validation_report": {
+    "query_smoke_check": {
+      "status": "passed"
+    }, 
+    "errors": [], 
+    "identifier_check": {
+      "status": "needs_review", 
+      "ids_valid": 6, 
+      "labels_checked": 15, 
+      "ids_configured": 6, 
+      "labels_empty": [
+        "任务", 
+        "作业", 
+        "信息化需求", 
+        "信息系统", 
+        "协同业务事项", 
+        "子对象", 
+        "应用", 
+        "智慧海关任务", 
+        "角色岗位"
+      ], 
+      "coverage": 1.0
+    }, 
+    "warnings": [
+      "类型 任务 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 作业 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 信息化需求 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 信息系统 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 协同业务事项 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 子对象 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 应用 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 智慧海关任务 在图中无数据（0 节点），搜索配置暂不可用", 
+      "类型 角色岗位 在图中无数据（0 节点），搜索配置暂不可用", 
+      "9 个类型在图中无数据（任务、作业、信息化需求、信息系统、协同业务事项、子对象、应用、智慧海关任务、角色岗位），对应搜索配置暂不可用；若图确实含这些类型请检查绑定图名，否则应从配置移除", 
+      "当前尚无已验证的依赖传播关系"
+    ], 
+    "format_check": {
+      "status": "passed"
+    }, 
+    "relation_structure_check": {
+      "status": "passed", 
+      "count": 0, 
+      "catalog_total": 17, 
+      "catalog_observed": 5, 
+      "missing": 0
+    }, 
+    "overall": "needs_review", 
+    "dependency_semantics_check": {
+      "status": "needs_review", 
+      "total_paths": 0, 
+      "verified_paths": 0
+    }
+  }, 
+  "relationship_meanings": {
+    "包括": "组成/层级关系：用于归属聚合，不构成跨业务依赖（语义待人工确认）", 
+    "承载": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "协同": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "映射": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "下位": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "上位": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "权属": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "使用": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "执行": "关联关系：仅表明结构关联，不推定业务依赖（待人工确认）", 
+    "隶属": "组成/层级关系：用于归属聚合，不构成跨业务依赖（语义待人工确认）"
+  }, 
+  "association_paths": [
+    {
+      "start_label": "业务子项", 
+      "steps": [
+        {
+          "target_label": "主管部门", 
+          "direction": "in", 
+          "relation": "执行"
+        }
+      ]
+    }, 
+    {
+      "start_label": "主管部门", 
+      "steps": [
+        {
+          "target_label": "业务子项", 
+          "direction": "out", 
+          "relation": "执行"
+        }
+      ]
+    }, 
+    {
+      "start_label": "对象", 
+      "steps": [
+        {
+          "target_label": "相对人", 
+          "direction": "out", 
+          "relation": "权属"
+        }
+      ]
+    }, 
+    {
+      "start_label": "相对人", 
+      "steps": [
+        {
+          "target_label": "对象", 
+          "direction": "in", 
+          "relation": "权属"
+        }
+      ]
+    }
+  ], 
+  "_说明": "本文件由 V4.1 扫描生成器产出（候选版），依赖语义需人工确认后才生效；人工可编辑 aliases/query_templates/report_headers/influence_rules 等词表字段，再次扫描时按稳定键继承", 
+  "core_semantics": {
+    "dependency_rel": "", 
+    "name_prop": "名称", 
+    "system_label": "信息系统", 
+    "dependency_depth": 6, 
+    "rollup_exclude_rels": [
+      "协同"
+    ], 
+    "candidate_labels": [
+      "业务子项", 
+      "主管部门", 
+      "作业"
+    ], 
+    "anchor_label": "业务子项", 
+    "hosting_rel": "承载", 
+    "dependency_enabled": false
+  }, 
+  "influence_rules": {}, 
+  "query_templates": [], 
+  "name_properties": {
+    "协同业务事项": {
+      "name": "协同业务名称", 
+      "id": null
+    }, 
+    "主管部门": {
+      "name": "事项主管部门/处室", 
+      "id": "id~"
+    }, 
+    "信息化需求": {
+      "name": "名称", 
+      "id": null
+    }, 
+    "信息系统": {
+      "name": "名称", 
+      "id": null
+    }, 
+    "对象": {
+      "name": "名称", 
+      "id": "id~"
+    }, 
+    "业务子项": {
+      "name": "名称", 
+      "id": "id~"
+    }, 
+    "作业": {
+      "name": "功能模块名称", 
+      "id": null
+    }, 
+    "海关部门": {
+      "name": "司局", 
+      "id": "id~"
+    }, 
+    "业务事项": {
+      "name": "名称", 
+      "id": "id~"
+    }, 
+    "相对人": {
+      "name": "服务对象", 
+      "id": "id~"
+    }, 
+    "任务": {
+      "name": "任务名称(节点名称)", 
+      "id": null
+    }, 
+    "应用": {
+      "name": "应用名称", 
+      "id": null
+    }, 
+    "角色岗位": {
+      "name": "名称", 
+      "id": null
+    }, 
+    "子对象": {
+      "name": "名称", 
+      "id": null
+    }, 
+    "智慧海关任务": {
+      "name": "方案名称", 
+      "id": null
+    }
+  }, 
+  "generation_info": {
+    "status": "candidate", 
+    "scan_warnings": [
+      "依赖传播关系：未找到名称含“依赖/引用/调用”的非多态关系，已禁用依赖传播；结构关系仍可用于关联分析"
+    ], 
+    "reconfirm_required": [], 
+    "graph": "海关业务底账-0109_1", 
+    "source": "official+cypher_scan", 
+    "validation_report": {
+      "query_smoke_check": {
+        "status": "passed"
+      }, 
+      "errors": [], 
+      "identifier_check": {
+        "status": "needs_review", 
+        "ids_valid": 6, 
+        "labels_checked": 15, 
+        "ids_configured": 6, 
+        "labels_empty": [
+          "任务", 
+          "作业", 
+          "信息化需求", 
+          "信息系统", 
+          "协同业务事项", 
+          "子对象", 
+          "应用", 
+          "智慧海关任务", 
+          "角色岗位"
+        ], 
+        "coverage": 1.0
+      }, 
+      "warnings": [
+        "类型 任务 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 作业 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 信息化需求 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 信息系统 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 协同业务事项 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 子对象 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 应用 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 智慧海关任务 在图中无数据（0 节点），搜索配置暂不可用", 
+        "类型 角色岗位 在图中无数据（0 节点），搜索配置暂不可用", 
+        "9 个类型在图中无数据（任务、作业、信息化需求、信息系统、协同业务事项、子对象、应用、智慧海关任务、角色岗位），对应搜索配置暂不可用；若图确实含这些类型请检查绑定图名，否则应从配置移除", 
+        "当前尚无已验证的依赖传播关系"
+      ], 
+      "format_check": {
+        "status": "passed"
+      }, 
+      "relation_structure_check": {
+        "status": "passed", 
+        "count": 0, 
+        "catalog_total": 17, 
+        "catalog_observed": 5, 
+        "missing": 0
+      }, 
+      "overall": "needs_review", 
+      "dependency_semantics_check": {
+        "status": "needs_review", 
+        "total_paths": 0, 
+        "verified_paths": 0
+      }
+    }, 
+    "generated_at": "2026-11-16 10:19:33"
+  }, 
+  "aliases": {}
+}

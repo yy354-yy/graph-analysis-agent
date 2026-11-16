@@ -1,0 +1,65 @@
+{
+  "graph": "海关业务底账-0109_1", 
+  "versions": [
+    {
+      "version": "v20261116101944", 
+      "time": "2026-11-16 10:19:44", 
+      "action": "publish", 
+      "content_hash": "f59f1e1c991c00a2", 
+      "validation": {
+        "query_smoke_check": {
+          "status": "passed"
+        }, 
+        "errors": [], 
+        "identifier_check": {
+          "status": "needs_review", 
+          "ids_valid": 6, 
+          "labels_checked": 15, 
+          "ids_configured": 6, 
+          "labels_empty": [
+            "任务", 
+            "作业", 
+            "信息化需求", 
+            "信息系统", 
+            "协同业务事项", 
+            "子对象", 
+            "应用", 
+            "智慧海关任务", 
+            "角色岗位"
+          ], 
+          "coverage": 1.0
+        }, 
+        "warnings": [
+          "类型 任务 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 作业 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 信息化需求 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 信息系统 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 协同业务事项 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 子对象 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 应用 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 智慧海关任务 在图中无数据（0 节点），搜索配置暂不可用", 
+          "类型 角色岗位 在图中无数据（0 节点），搜索配置暂不可用", 
+          "9 个类型在图中无数据（任务、作业、信息化需求、信息系统、协同业务事项、子对象、应用、智慧海关任务、角色岗位），对应搜索配置暂不可用；若图确实含这些类型请检查绑定图名，否则应从配置移除", 
+          "当前尚无已验证的依赖传播关系"
+        ], 
+        "format_check": {
+          "status": "passed"
+        }, 
+        "relation_structure_check": {
+          "status": "passed", 
+          "count": 0, 
+          "catalog_total": 17, 
+          "catalog_observed": 5, 
+          "missing": 0
+        }, 
+        "overall": "needs_review", 
+        "dependency_semantics_check": {
+          "status": "needs_review", 
+          "total_paths": 0, 
+          "verified_paths": 0
+        }
+      }, 
+      "schema_fingerprint": "de2b52a7e6e0b095"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "galaxy_base": "http://127.0.0.1:18088",
+  "galaxy_user": "admin",
+  "galaxy_pass": "******",
+  "galaxy_graph": "业务底账12类图",
+  "llm_platform": "dify",
+  "dify_base": "http://192.168.27.129/v1",
+  "dify_key": "******",
+
+  "sfm_base": "http://127.0.0.1/sfm-agent-studio/sfm-api-gateway/gateway/agent/api",
+  "sfm_key": "******",
+  "sfm_agent_code": "",
+  "sfm_intent_agent_code": "",
+  "sfm_adhoc_agent_code": "",
+  "sfm_prompt_mode": "text",
+  "llm_timeout_intent_read": "300",
+  "llm_timeout_adhoc_read": "300",
+  "debug_log": "1"
+}

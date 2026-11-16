@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理控制台 · 分析智能体2.0</title>
+<style>
+  :root {
+    --primary: #4c54c4;
+    --primary-grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #d946ef 120%);
+    --ease: cubic-bezier(.4, 0, .2, 1);
+    --text: #1e2433;
+    --text-sub: #6b7288;
+    --border: #e4e6f0;
+    --ok: #1d9e6e;
+    --err: #d64545;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f3f4f9; color: var(--text); font-size: 14px;
+  }
+  a { color: var(--primary); text-decoration: none; }
+
+  /* ---- aurora 背景（与主页同款氛围） ---- */
+  .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .aurora .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; }
+  .aurora .b1 { width: 480px; height: 480px; left: -120px; top: -140px;
+    background: radial-gradient(circle, rgba(139,92,246,.45), transparent 65%); }
+  .aurora .b2 { width: 420px; height: 420px; right: -100px; top: 30%;
+    background: radial-gradient(circle, rgba(99,102,241,.38), transparent 65%); }
+  .aurora .b3 { width: 380px; height: 380px; left: 35%; bottom: -160px;
+    background: radial-gradient(circle, rgba(217,70,239,.22), transparent 65%); }
+
+  /* ---- 深色侧栏（与主页 aside 同风格） ---- */
+  nav {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 204px; z-index: 10;
+    background: #131735; color: #cdd3f0;
+    padding: 22px 12px 16px; display: flex; flex-direction: column;
+  }
+  nav::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(560px 320px at -10% -10%, rgba(139,92,246,.28), transparent 60%),
+                radial-gradient(420px 280px at 120% 110%, rgba(99,102,241,.22), transparent 60%);
+  }
+  nav > * { position: relative; }
+  nav .brand { font-weight: 700; font-size: 16px; padding: 0 10px 18px; color: #fff; }
+  nav .brand .grad {
+    background: var(--primary-grad); -webkit-background-clip: text;
+    background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  nav .brand small { display: block; font-size: 11px; color: #8b93c4; font-weight: 400; margin-top: 2px; }
+  nav .nav-item {
+    display: flex; align-items: center; gap: 9px; padding: 10px 12px; margin: 2px 0;
+    border-radius: 9px; color: #aab2dd; font-size: 13.5px; cursor: pointer;
+    border: none; background: transparent; width: 100%; text-align: left; font-family: inherit;
+    transition: all .2s var(--ease);
+  }
+  nav .nav-item:hover { background: rgba(129,140,248,.14); color: #fff; }
+  nav .nav-item.on { background: rgba(129,140,248,.22); color: #fff; font-weight: 600; }
+  nav .nav-item .dot { width: 7px; height: 7px; border-radius: 2px; background: #565f96; flex: none; }
+  nav .nav-item.on .dot { background: #a5b4fc; }
+  nav .nav-back { margin-top: auto; border-top: 1px solid rgba(255,255,255,.07); padding-top: 12px; }
+
+  main { margin-left: 204px; padding: 28px 34px 70px; max-width: 1040px; position: relative; z-index: 1; }
+  .panel { display: none; }
+  .panel.on { display: block; }
+  .panel-head {
+    margin-bottom: 18px; display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap;
+  }
+  .panel-head .titles { flex: 1; min-width: 260px; }
+  .panel-head h1 {
+    font-size: 20px;
+    background: var(--primary-grad); -webkit-background-clip: text;
+    background-clip: text; -webkit-text-fill-color: transparent;
+    display: inline-block;
+  }
+  .panel-head p { color: var(--text-sub); font-size: 12.5px; margin-top: 4px; }
+  .panel-head .top-actions { display: flex; align-items: center; gap: 10px; padding-top: 3px; }
+
+  .card {
+    background: rgba(255,255,255,.88); border: 1px solid rgba(30,36,60,.07);
+    border-radius: 14px; box-shadow: 0 1px 2px rgba(24,32,72,.05), 0 6px 20px rgba(24,32,72,.06);
+    padding: 16px 20px; margin-bottom: 14px;
+    backdrop-filter: blur(6px);
+  }
+  .card h3 {
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  }
+  .card h3 .sub { font-size: 12px; color: var(--text-sub); font-weight: 400; }
+  .card .foot {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+  }
+  .card .foot.no-line { border-top: none; padding-top: 4px; margin-top: 8px; }
+
+  /* ---- 表单 ---- */
+  .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; margin-top: 10px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.wide { grid-column: 1 / -1; }
+  .field label { font-size: 12.5px; color: var(--text-sub); }
+  .field label b { color: var(--text); font-weight: 600; }
+  .field label code {
+    font-family: ui-monospace, Consolas, monospace; font-size: 11px;
+    color: #9aa1b6; background: rgba(99,102,241,.08); border-radius: 4px; padding: 1px 5px;
+  }
+  .field input, .field select, .field textarea {
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font-size: 13px; font-family: inherit; background: #fff; color: var(--text);
+    outline: none; width: 100%; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--primary); box-shadow: 0 0 0 2.5px rgba(99,102,241,.14);
+  }
+  .field .hint { font-size: 11.5px; color: var(--text-sub); }
+
+  .btn {
+    border: 1px solid rgba(99,102,241,.35); border-radius: 9px; padding: 7px 16px;
+    font-size: 13px; cursor: pointer; background: rgba(129,140,248,.1);
+    color: #4c54c4; font-family: inherit; font-weight: 600;
+    transition: all .2s var(--ease);
+  }
+  .btn:hover { background: rgba(129,140,248,.22); color: #3a41a8; }
+  .btn.primary { background: var(--primary-grad); border: none; color: #fff; }
+  .btn.primary:hover { opacity: .9; }
+  .btn.danger { color: var(--err); border-color: rgba(214,69,69,.35); background: rgba(214,69,69,.06); }
+  .btn.danger:hover { background: rgba(214,69,69,.14); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .msg { font-size: 12.5px; white-space: pre-wrap; word-break: break-all; flex: 1; min-width: 120px; }
+  .msg.ok { color: var(--ok); }
+  .msg.err { color: var(--err); }
+
+  /* ---- 开关 ---- */
+  .switch-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+  .switch-row input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; }
+  .switch-row span b { font-weight: 600; }
+  .switch-row .hint { margin-left: 4px; }
+
+  /* ---- 提示词 ---- */
+  .p-item {
+    border: 1px solid rgba(30,36,60,.07); border-radius: 11px; margin-bottom: 8px;
+    overflow: hidden; background: rgba(255,255,255,.88); backdrop-filter: blur(6px);
+  }
+  .p-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; }
+  .p-head:hover { background: rgba(129,140,248,.07); }
+  .p-title { font-weight: 600; font-size: 13.5px; flex: none; }
+  .p-name { font-size: 11px; color: #9aa1b6; font-family: ui-monospace, Consolas, monospace; flex: none; }
+  .p-desc { color: var(--text-sub); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-badge { font-size: 11px; padding: 2px 9px; border-radius: 20px; background: #fff4e0; color: #b26a00; flex: none; }
+  .p-badge.default { background: #f0f1f7; color: var(--text-sub); }
+  .p-body { border-top: 1px solid var(--border); padding: 14px; display: none; }
+  .p-item.open .p-body { display: block; }
+  .p-body textarea {
+    width: 100%; min-height: 300px; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; font-size: 12.5px; line-height: 1.6;
+    font-family: ui-monospace, Consolas, monospace; resize: vertical;
+    white-space: pre; outline: none;
+  }
+  .p-body textarea:focus { border-color: var(--primary); }
+  .p-ph { font-size: 11.5px; color: #b26a00; margin-top: 6px; }
+
+  /* ---- 运行日志 ---- */
+  .rl-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .rl-toolbar select {
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+    font-size: 12.5px; background: #fff;
+  }
+  .rl-meta { font-size: 11.5px; color: var(--text-sub); margin: 8px 0 10px; word-break: break-all; }
+  .rl-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; background: #fff; }
+  .rl-head { display: flex; gap: 10px; align-items: center; padding: 7px 11px; cursor: pointer; font-size: 12.5px; border-radius: 8px; }
+  .rl-head:hover { background: rgba(129,140,248,.07); }
+  .rl-time { color: var(--text-sub); font-family: ui-monospace, Consolas, monospace; flex: none; }
+  .rl-type { font-size: 11px; padding: 1px 7px; border-radius: 12px; background: #f0f1f7; color: var(--text-sub); flex: none; }
+  .rl-type-intent, .rl-type-state { background: #e8f0ff; color: #2b5cd9; }
+  .rl-type-llm { background: #f3e8ff; color: #8b5cf6; }
+  .rl-type-graph, .rl-type-adhoc { background: #e6f7ef; color: var(--ok); }
+  .rl-type-error { background: #fdeaea; color: var(--err); }
+  .rl-sum { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rl-pre {
+    display: none; border-top: 1px solid var(--border); padding: 10px 12px;
+    font-size: 11.5px; line-height: 1.55; overflow: auto; max-height: 380px;
+    background: #fafafe; white-space: pre-wrap; word-break: break-all;
+    font-family: ui-monospace, Consolas, monospace;
+  }
+  .rl-item.open .rl-pre { display: block; }
+  .rl-empty { color: var(--text-sub); font-size: 12.5px; padding: 18px; text-align: center; }
+
+  /* ---- 绑定向导（自 index.html 移植） ---- */
+  .bind-steps {
+    display: inline-flex; gap: 6px; padding: 4px;
+    background: rgba(99,102,241,.09); border-radius: 10px; margin-top: 8px; flex-wrap: wrap;
+  }
+  .bind-step-btn {
+    border: none; background: transparent; color: #5b6178;
+    border-radius: 8px; padding: 6px 12px; font-size: 12.5px;
+    font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .bind-step-btn:hover { color: var(--primary); }
+  .bind-step-btn.on { background: #fff; color: var(--primary); box-shadow: 0 2px 8px rgba(76,84,196,.16); }
+  .bind-pane { margin-top: 12px; max-height: 60vh; overflow: auto; }
+  .bind-tip { font-size: 12px; color: var(--text-sub); margin: 6px 0; line-height: 1.5; }
+  .bind-table { width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; }
+  .bind-table th, .bind-table td { border: 1px solid #e2e4f5; padding: 4px 7px; text-align: left; word-break: break-all; }
+  .bind-table th { background: #f6f7fe; color: var(--primary); font-weight: 600; }
+  #bind-step-relations .bind-table { min-width: 940px; }
+  #bind-step-relations .dep-meaning { min-width: 160px; }
+  #bind-step-relations select { max-width: 170px; }
+  .badge {
+    display: inline-block; border-radius: 6px; padding: 1px 7px;
+    font-size: 11px; font-weight: 600; margin-right: 4px; white-space: nowrap;
+  }
+  .badge.ok { background: #e3f6ee; color: var(--ok); }
+  .badge.warn { background: #fdf3e0; color: #b97a0e; }
+  .badge.off { background: #f1f2f8; color: #7a8099; }
+  .badge.err { background: #fdeaea; color: var(--err); }
+  .bind-warn { color: #b97a0e; font-size: 12px; margin: 4px 0; white-space: pre-line; }
+  .bind-ok { color: var(--ok); font-size: 12.5px; font-weight: 600; white-space: pre-line; }
+  .bind-err { color: var(--err); font-size: 12.5px; white-space: pre-line; }
+
+  /* ---- Schema 表格（别名 / 关系含义 折叠校对） ---- */
+  .sn-fold {
+    border: 1px solid rgba(30,36,60,.08); border-radius: 10px;
+    background: rgba(250,251,255,.8); margin-top: 12px;
+  }
+  .sn-fold > summary {
+    cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 600;
+    color: var(--primary); list-style: none;
+  }
+  .sn-fold > summary::-webkit-details-marker { display: none; }
+  .sn-fold > summary::before { content: '▸ '; color: #9aa1b6; }
+  .sn-fold[open] > summary::before { content: '▾ '; }
+  .sn-fold .sn-body { padding: 4px 14px 12px; }
+  .sn-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .sn-table th, .sn-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  .sn-table th { color: var(--text-sub); font-weight: 600; font-size: 12px; }
+  .sn-table input, .sn-table select {
+    width: 100%; border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 8px; font-size: 12.5px; background: #fff; font-family: inherit;
+  }
+  .sn-table .sn-del {
+    border: none; background: #fdeaea; color: var(--err); border-radius: 7px;
+    padding: 5px 10px; cursor: pointer; font-size: 12px;
+  }
+  .sn-table .sn-del:hover { background: #f8cfcf; }
+  .sn-tip { font-size: 12px; color: var(--text-sub); margin: 8px 0 10px; word-break: break-all; line-height: 1.55; }
+
+  @media (max-width: 860px) {
+    nav { position: static; width: auto; border-right: none; border-bottom: 1px solid rgba(255,255,255,.08); }
+    main { margin-left: 0; padding: 18px; }
+    .fgrid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+
+<nav>
+  <div class="brand"><span class="grad">管理控制台</span><small>配置保存后即时生效，无需重启</small></div>
+  <button class="nav-item on" data-panel="cfg"><span class="dot"></span>系统配置</button>
+  <button class="nav-item" data-panel="prompts"><span class="dot"></span>提示词</button>
+  <button class="nav-item" data-panel="runlog"><span class="dot"></span>运行日志</button>
+  <button class="nav-item" data-panel="schema"><span class="dot"></span>图谱与 Schema</button>
+  <div class="nav-back">
+    <a class="nav-item" href="/"><span class="dot"></span>返回对话界面</a>
+  </div>
+</nav>
+
+<main>
+  <!-- ==================== 系统配置 ==================== -->
+  <section class="panel on" id="panel-cfg">
+    <div class="panel-head">
+      <div class="titles">
+        <h1>系统配置</h1>
+        <p>图数据库与大模型平台的运行时连接配置。保存后实时生效；密码类输入留空或保持掩码 = 不修改。</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn primary" id="cfg-save">保存全部配置</button>
+        <span class="msg" id="cfg-msg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>图数据库（Galaxybase）</h3>
+      <div class="fgrid">
+        <div class="field wide"><label><b>服务地址</b> <code>galaxy_base</code></label>
+          <input data-cfg="galaxy_base" placeholder="http://IP:18088">
+        </div>
+        <div class="field"><label><b>用户名</b> <code>galaxy_user</code></label>
+          <input data-cfg="galaxy_user">
+        </div>
+        <div class="field"><label><b>密码</b> <code>galaxy_pass</code></label>
+          <input data-cfg="galaxy_pass" type="password" placeholder="留空或掩码 = 不修改">
+        </div>
+        <div class="field"><label><b>图名</b> <code>galaxy_graph</code></label>
+          <input data-cfg="galaxy_graph">
+          <span class="hint">REST 层无「列出所有图」接口，图名必须人工指定</span>
+        </div>
+        <div class="field"><label><b>RSA 登录公钥</b> <code>galaxy_rsa_key</code></label>
+          <input data-cfg="galaxy_rsa_key" type="password" placeholder="换环境时在界面覆盖">
+        </div>
+      </div>
+      <div class="foot no-line">
+        <button class="btn" id="cfg-test-graph">测试图库连接</button>
+        <span class="msg" id="cfg-test-graph-msg"></span>
+        <span class="hint" style="font-size:11.5px;color:var(--text-sub)">按当前表单值测试，无需先保存</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>大模型算力平台</h3>
+      <div class="fgrid">
+        <div class="field"><label><b>平台</b> <code>llm_platform</code></label>
+          <select data-cfg="llm_platform">
+            <option value="dify">dify（本地测试）</option>
+            <option value="sfm">sfm（生产）</option>
+          </select>
+        </div>
+        <div class="field"><label><b>意图输出协议</b> <code>sfm_intent_format</code></label>
+          <select data-cfg="sfm_intent_format">
+            <option value="json">json（严格 JSON）</option>
+            <option value="text3">text3（三行文本，弱模型推荐）</option>
+          </select>
+          <span class="hint">意图识别输出协议；text3 解析失败兜底 qa 不再降级 chat</span>
+        </div>
+        <div class="field"><label><b>SFM 指令通道</b> <code>sfm_prompt_mode</code></label>
+          <select data-cfg="sfm_prompt_mode">
+            <option value="text">text（指令拼正文，默认，不依赖平台）</option>
+            <option value="metadata">metadata（走平台 system 注入）</option>
+          </select>
+          <span class="hint">生产实证平台可能不把 metadata.prompt 注入 system；text 模式指令随正文直达模型</span>
+        </div>
+        <div class="field wide cfg-dify"><label><b>Dify 地址</b> <code>dify_base</code></label>
+          <input data-cfg="dify_base" placeholder="带 /v1">
+        </div>
+        <div class="field wide cfg-dify"><label><b>Dify Key</b> <code>dify_key</code></label>
+          <input data-cfg="dify_key" type="password" placeholder="app- 开头（留空或掩码 = 不修改）">
+        </div>
+        <div class="field wide cfg-sfm"><label><b>SFM 网关地址</b> <code>sfm_base</code></label>
+          <input data-cfg="sfm_base">
+        </div>
+        <div class="field cfg-sfm"><label><b>SFM Key</b> <code>sfm_key</code></label>
+          <input data-cfg="sfm_key" type="password" placeholder="APP_KEY（留空或掩码 = 不修改）">
+        </div>
+        <div class="field cfg-sfm"><label><b>主智能体编码</b> <code>sfm_agent_code</code></label>
+          <input data-cfg="sfm_agent_code">
+        </div>
+        <div class="field cfg-sfm"><label><b>主智能体版本</b> <code>sfm_agent_version</code></label>
+          <input data-cfg="sfm_agent_version" placeholder="可选">
+        </div>
+        <div class="field cfg-sfm"><label><b>意图识别智能体编码</b> <code>sfm_intent_agent_code</code></label>
+          <input data-cfg="sfm_intent_agent_code" placeholder="留空 = 用主智能体">
+          <span class="hint">配轻量小模型可大幅缩短每轮开场等待</span>
+        </div>
+        <div class="field cfg-sfm"><label><b>adhoc 生成智能体编码</b> <code>sfm_adhoc_agent_code</code></label>
+          <input data-cfg="sfm_adhoc_agent_code" placeholder="留空 = 用主智能体">
+        </div>
+      </div>
+      <div class="foot no-line">
+        <button class="btn" id="cfg-test-llm">测试大模型连接</button>
+        <span class="msg" id="cfg-test-llm-msg"></span>
+        <span class="hint" style="font-size:11.5px;color:var(--text-sub)">按当前表单值做一次小补全调用，无需先保存</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>超时与日志</h3>
+      <div class="fgrid">
+        <div class="field"><label><b>意图识别读超时（秒）</b> <code>llm_timeout_intent_read</code></label>
+          <input data-cfg="llm_timeout_intent_read" type="number" min="30" max="600" placeholder="30-600，默认 300">
+        </div>
+        <div class="field"><label><b>adhoc 生成读超时（秒）</b> <code>llm_timeout_adhoc_read</code></label>
+          <input data-cfg="llm_timeout_adhoc_read" type="number" min="30" max="600" placeholder="30-600，默认 300">
+        </div>
+        <div class="field wide"><label><b>日志开关</b></label>
+          <div class="switch-row"><input type="checkbox" id="cfg-debug-log" checked>
+            <span><b>记录运行日志</b><span class="hint">（debug_log）意图 / LLM / Cypher / 回答落盘 runlog.jsonl</span></span></div>
+          <div class="switch-row"><input type="checkbox" id="cfg-debug-detail" checked>
+            <span><b>诊断明细</b><span class="hint">（debug_log_detail）完整记录 Cypher 原文 / LLM 入参 / 实体名；涉密场景可关</span></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 提示词 ==================== -->
+  <section class="panel" id="panel-prompts">
+    <div class="panel-head">
+      <div class="titles">
+        <h1>提示词</h1>
+        <p>覆盖保存即时生效（无需重启）。带占位符的提示词保存时校验占位符完整性；「恢复默认」删除覆盖条目。</p>
+      </div>
+      <div class="top-actions"><button class="btn" id="p-reload">刷新列表</button></div>
+    </div>
+    <div id="p-list"></div>
+    <span class="msg" id="p-msg"></span>
+  </section>
+
+  <!-- ==================== 运行日志 ==================== -->
+  <section class="panel" id="panel-runlog">
+    <div class="panel-head">
+      <div class="titles">
+        <h1>运行日志</h1>
+        <p>每轮的意图识别、LLM 完整入参与回答、各阶段图查询（0 行不记）。点击条目展开 JSON 详情。排查「生产回答异常」先看这里。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="rl-toolbar">
+        <select id="ad-rl-filter">
+          <option value="">全部类型</option>
+          <option value="turn">turn（每轮输入）</option>
+          <option value="intent">intent（意图识别）</option>
+          <option value="llm">llm（流式回答）</option>
+          <option value="search">search（候选搜索）</option>
+          <option value="adhoc">adhoc（生成的 Cypher）</option>
+          <option value="graph">graph（图查询）</option>
+          <option value="state">state（状态变迁）</option>
+          <option value="error">error（异常）</option>
+          <option value="turn_end">turn_end（轮收尾）</option>
+        </select>
+        <button class="btn" id="ad-rl-refresh">刷新</button>
+        <button class="btn" id="ad-rl-dl">下载</button>
+        <button class="btn danger" id="ad-rl-clear">清空</button>
+      </div>
+      <div class="rl-meta" id="ad-rl-meta">加载中…</div>
+      <div id="ad-rl-list"><div class="rl-empty">加载中…</div></div>
+    </div>
+    <div class="card">
+      <h3>记录开关 <span class="sub">改一项立即生效，只提交该键不影响其他配置</span></h3>
+      <div class="switch-row"><input type="checkbox" id="ad-rl-toggle" checked>
+        <span><b>记录运行日志</b><span class="hint">（debug_log）关闭后不再落盘</span></span></div>
+      <div class="switch-row"><input type="checkbox" id="ad-rl-detail" checked>
+        <span><b>诊断明细</b><span class="hint">（debug_log_detail）完整 Cypher / LLM 入参 / 实体名；涉密场景可关 = 瘦身</span></span></div>
+    </div>
+  </section>
+
+  <!-- ==================== 图谱与 Schema ==================== -->
+  <section class="panel" id="panel-schema">
+    <div class="panel-head">
+      <div class="titles">
+        <h1>图谱与 Schema</h1>
+        <p>换图流程：系统配置改图名并保存 → ① 扫描 → ② 确认关系语义（依赖传播在这里配）→ ③ 差异 → ④ 校验 → ⑤ 发布，发布后可回滚。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>图模型绑定 <span class="sub">扫描只读不覆盖配置；只有单独启用并确认方向的关系才传播影响</span></h3>
+      <div class="foot no-line">
+        <button class="btn" id="sn-bind-btn">快速绑定（读取 schema 直接生成/更新配置）</button>
+        <span class="msg" id="sn-bind-msg"></span>
+      </div>
+      <div class="bind-steps" style="margin-top:14px">
+        <button type="button" class="bind-step-btn on" data-bind-step="scan">① 扫描</button>
+        <button type="button" class="bind-step-btn" data-bind-step="relations">② 关系语义</button>
+        <button type="button" class="bind-step-btn" data-bind-step="diff">③ 差异</button>
+        <button type="button" class="bind-step-btn" data-bind-step="publish">④ 校验 / 发布</button>
+        <button type="button" class="bind-step-btn" data-bind-step="versions">⑤ 版本 / 回滚</button>
+      </div>
+      <div class="sn-tip" id="bind-meta">尚未扫描。点「① 扫描」按上方系统配置的地址/账号/图名执行。</div>
+
+      <div id="bind-step-scan" class="bind-pane">
+        <div style="margin-bottom:8px"><button type="button" class="btn" id="bind-scan-btn">开始扫描</button></div>
+        <div id="bind-scan-out"></div>
+      </div>
+
+      <div id="bind-step-relations" class="bind-pane" style="display:none">
+        <div class="bind-tip">三类状态：结构已发现（图中观察到）→ 查询已验证（校验实查通过）→ 依赖语义已确认（人工确认，仅此类传播影响）。
+          确认语义并明确影响方向后勾选「允许传播」；关系含义也在这里填（发布后即生效），不必再到下方重复配置。</div>
+        <div style="margin-bottom:8px"><button type="button" class="btn" id="bind-relations-btn">刷新关系清单</button></div>
+        <div id="bind-relations-out"></div>
+      </div>
+
+      <div id="bind-step-diff" class="bind-pane" style="display:none">
+        <div class="bind-tip">已发布版 vs 候选版差异；无已发布配置时显示候选全量要点。</div>
+        <div style="margin-bottom:8px"><button type="button" class="btn" id="bind-diff-btn">刷新差异</button></div>
+        <div id="bind-diff-out"></div>
+      </div>
+
+      <div id="bind-step-publish" class="bind-pane" style="display:none">
+        <div style="margin-bottom:8px">
+          <button type="button" class="btn" id="bind-validate-btn">执行校验</button>
+          <button type="button" class="btn primary" id="bind-publish-btn">发布候选配置</button>
+        </div>
+        <div id="bind-publish-out"></div>
+      </div>
+
+      <div id="bind-step-versions" class="bind-pane" style="display:none">
+        <div style="margin-bottom:8px"><button type="button" class="btn" id="bind-versions-btn">刷新版本列表</button></div>
+        <div id="bind-versions-out"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>schema_notes 补充校对 <span class="sub">依赖关系语义走上方向导②，这里只管向导不覆盖的两项</span></h3>
+      <div class="sn-tip" id="ad-sn-meta-tip">加载中…</div>
+
+      <details class="sn-fold">
+        <summary>别名（用户词 → 实体类型）</summary>
+        <div class="sn-body">
+          <div class="sn-tip">同义词映射，影响意图识别和搜索定位；labels 用英文逗号分隔。向导不管理此项，在此维护。</div>
+          <table class="sn-table"><thead><tr><th style="width:32%">同义词</th><th>实体类型（逗号分隔）</th><th style="width:60px"></th></tr></thead>
+            <tbody id="ad-sn-aliases-tbody"></tbody></table>
+          <div class="foot no-line"><button class="btn sn-add" data-add="aliases">+ 加一行</button></div>
+        </div>
+      </details>
+
+      <details class="sn-fold">
+        <summary>关系含义（非依赖关系的措辞参考，可留空）</summary>
+        <div class="sn-body">
+          <div class="sn-tip">依赖/传播关系的语义与含义请走上方向导②（发布后生效）；此处配置其他关系（如 包括/隶属）的业务含义，
+            留空 = 分析时按关系名字面理解，不影响使用。</div>
+          <table class="sn-table"><thead><tr><th style="width:26%">关系类型</th><th>业务含义（可留空）</th><th style="width:20%">方向（A -&gt; B）</th><th style="width:60px"></th></tr></thead>
+            <tbody id="ad-sn-meanings-tbody"></tbody></table>
+          <div class="foot no-line">
+            <button class="btn sn-add" data-add="meanings">+ 加一行</button>
+            <button class="btn" id="ad-sn-reload">重新加载</button>
+            <button class="btn primary" id="ad-sn-save-btn">保存 schema_notes</button>
+            <span class="msg" id="ad-sn-save-msg"></span>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<script>
+// ====================== 面板切换（hash 路由，刷新保持） ======================
+const PANELS = ['cfg', 'prompts', 'runlog', 'schema'];
+function switchPanel(name) {
+  if (PANELS.indexOf(name) < 0) name = 'cfg';
+  document.querySelectorAll('.panel').forEach(p =>
+    p.classList.toggle('on', p.id === 'panel-' + name));
+  document.querySelectorAll('nav .nav-item[data-panel]').forEach(b =>
+    b.classList.toggle('on', b.dataset.panel === name));
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+}
+document.querySelectorAll('nav .nav-item[data-panel]').forEach(btn => {
+  btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+});
+window.addEventListener('hashchange', () => switchPanel(location.hash.slice(1)));
+switchPanel(location.hash.slice(1));
+
+// ====================== 工具 ======================
+async function readJson(r) {
+  try { return await r.json(); }
+  catch (e) { return { ok: false, error: '响应不是 JSON（HTTP ' + r.status + '）' }; }
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function setMsg(id, text, isErr) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'msg ' + (isErr ? 'err' : (text ? 'ok' : ''));
+}
+
+// ====================== 系统配置 ======================
+// 布尔开关与文本字段分开收集：开关转 "1"/"0"，其余 trim 后原样提交
+// （settings.save 合并语义：缺键/空串/密钥掩码 = 保留原值）
+const CFG_TOGGLES = [
+  ['debug_log', 'cfg-debug-log'],
+  ['debug_log_detail', 'cfg-debug-detail'],
+];
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/api/settings');
+    if (!r.ok) { setMsg('cfg-msg', '加载配置失败（HTTP ' + r.status + '）', true); return; }
+    const s = await readJson(r);
+    document.querySelectorAll('[data-cfg]').forEach(el => {
+      const k = el.dataset.cfg;
+      el.value = s[k] != null ? s[k] : '';
+    });
+    CFG_TOGGLES.forEach(([k, id]) => {
+      document.getElementById(id).checked = String(s[k] ?? '1') === '1';
+    });
+    togglePlatformFields(document.querySelector('[data-cfg=llm_platform]').value || 'dify');
+  } catch (e) { setMsg('cfg-msg', '加载配置失败：' + e.message, true); }
+}
+
+function togglePlatformFields(platform) {
+  document.querySelectorAll('.cfg-dify').forEach(el =>
+    el.style.display = platform === 'dify' ? '' : 'none');
+  document.querySelectorAll('.cfg-sfm').forEach(el =>
+    el.style.display = platform === 'sfm' ? '' : 'none');
+}
+document.querySelector('[data-cfg=llm_platform]').addEventListener('change', e =>
+  togglePlatformFields(e.target.value));
+
+function collectCfg() {
+  const body = {};
+  document.querySelectorAll('[data-cfg]').forEach(el => {
+    body[el.dataset.cfg] = el.value.trim();
+  });
+  CFG_TOGGLES.forEach(([k, id]) => {
+    body[k] = document.getElementById(id).checked ? '1' : '0';
+  });
+  return body;
+}
+
+document.getElementById('cfg-save').addEventListener('click', async () => {
+  setMsg('cfg-msg', '保存中…');
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectCfg()),
+    });
+    const d = await readJson(r);
+    if (r.ok) { setMsg('cfg-msg', d.msg || '已保存并实时生效'); loadSettings(); }
+    else setMsg('cfg-msg', d.error || '保存失败', true);
+  } catch (e) { setMsg('cfg-msg', '保存失败：' + e.message, true); }
+});
+
+// 连接测试：结果直接显示在按钮同一行（cfg-test-*-msg）
+document.getElementById('cfg-test-graph').addEventListener('click', async () => {
+  const msgId = 'cfg-test-graph-msg';
+  setMsg(msgId, '测试中…');
+  const b = collectCfg();
+  // 只发图库相关键；掩码/空 = 服务端沿用已保存值
+  const body = {
+    galaxy_base: b.galaxy_base, galaxy_graph: b.galaxy_graph,
+    galaxy_user: b.galaxy_user, galaxy_pass: b.galaxy_pass,
+    galaxy_rsa_key: b.galaxy_rsa_key,
+  };
+  try {
+    const r = await fetch('/api/test/graph', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await readJson(r);
+    setMsg(msgId, d.msg || (d.ok ? '连接成功' : '测试失败'), !d.ok);
+  } catch (e) { setMsg(msgId, '测试失败：' + e.message, true); }
+});
+
+document.getElementById('cfg-test-llm').addEventListener('click', async () => {
+  const msgId = 'cfg-test-llm-msg';
+  setMsg(msgId, '测试中（一次小补全调用）…');
+  const b = collectCfg();
+  const body = {
+    llm_platform: b.llm_platform, dify_base: b.dify_base, dify_key: b.dify_key,
+    sfm_base: b.sfm_base, sfm_key: b.sfm_key,
+    sfm_agent_code: b.sfm_agent_code, sfm_agent_version: b.sfm_agent_version,
+  };
+  try {
+    const r = await fetch('/api/test/llm', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await readJson(r);
+    setMsg(msgId, d.msg || (d.ok ? '连接成功' : '测试失败'), !d.ok);
+  } catch (e) { setMsg(msgId, '测试失败：' + e.message, true); }
+});
+
+// ====================== 提示词 ======================
+let promptItems = [];
+
+async function loadPrompts() {
+  const list = document.getElementById('p-list');
+  list.innerHTML = '<div class="rl-empty">加载中…</div>';
+  try {
+    const r = await fetch('/api/prompts');
+    const d = await readJson(r);
+    if (!r.ok) { list.innerHTML = '<div class="rl-empty">加载失败：' + esc(d.error || '') + '</div>'; return; }
+    promptItems = d.items || [];
+    renderPrompts();
+  } catch (e) { list.innerHTML = '<div class="rl-empty">加载失败：' + esc(e.message) + '</div>'; }
+}
+
+function renderPrompts() {
+  const list = document.getElementById('p-list');
+  list.innerHTML = promptItems.map((p, i) =>
+    '<div class="p-item" data-idx="' + i + '">' +
+    '<div class="p-head">' +
+    '<span class="p-title">' + esc((p.desc || '').split('（')[0] || p.name) + '</span>' +
+    '<span class="p-name">' + esc(p.name) + '</span>' +
+    '<span class="p-desc">' + esc(p.desc || '') + '</span>' +
+    (p.overridden ? '<span class="p-badge">已覆盖</span>' : '<span class="p-badge default">默认</span>') +
+    '</div>' +
+    '<div class="p-body">' +
+    '<textarea spellcheck="false"></textarea>' +
+    ((p.placeholders || []).length
+      ? '<div class="p-ph">必须保留占位符：' + p.placeholders.map(esc).join('、') + '</div>'
+      : '') +
+    '<div class="foot">' +
+    '<button class="btn primary p-save">保存并生效</button>' +
+    '<button class="btn p-reset">恢复默认</button>' +
+    '<span class="msg"></span>' +
+    '</div></div></div>').join('');
+
+  Array.from(list.querySelectorAll('.p-item')).forEach(item => {
+    const p = promptItems[Number(item.dataset.idx)];
+    const ta = item.querySelector('textarea');
+    ta.value = p.current;
+    item.querySelector('.p-head').addEventListener('click', () => {
+      const wasOpen = item.classList.contains('open');
+      Array.from(list.querySelectorAll('.p-item.open')).forEach(o => o.classList.remove('open'));
+      if (!wasOpen) { item.classList.add('open'); ta.value = p.current; setMsg2(item, ''); }
+    });
+    item.querySelector('.p-save').addEventListener('click', async () => {
+      setMsg2(item, '保存中…');
+      try {
+        const r = await fetch('/api/prompts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: p.name, text: ta.value }),
+        });
+        const d = await readJson(r);
+        if (r.ok) {
+          setMsg2(item, d.msg || '已保存并即时生效');
+          p.current = ta.value;
+          // 与出厂默认一致 = 覆盖条目已被服务端移除
+          p.overridden = (ta.value !== p.default);
+          refreshBadge(item, p);
+        } else setMsg2(item, d.error || '保存失败', true);
+      } catch (e) { setMsg2(item, '保存失败：' + e.message, true); }
+    });
+    item.querySelector('.p-reset').addEventListener('click', async () => {
+      if (!confirm('恢复「' + p.name + '」为出厂默认？（删除覆盖条目）')) return;
+      try {
+        const r = await fetch('/api/prompts/reset', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: p.name }),
+        });
+        const d = await readJson(r);
+        if (r.ok) { ta.value = p.default; p.current = p.default; p.overridden = false; refreshBadge(item, p); setMsg2(item, '已恢复默认'); }
+        else setMsg2(item, d.error || '恢复失败', true);
+      } catch (e) { setMsg2(item, '恢复失败：' + e.message, true); }
+    });
+  });
+}
+
+function setMsg2(item, text, isErr) {
+  const el = item.querySelector('.foot .msg');
+  el.textContent = text || '';
+  el.className = 'msg ' + (isErr ? 'err' : (text ? 'ok' : ''));
+}
+function refreshBadge(item, p) {
+  const badge = item.querySelector('.p-badge');
+  if (p.overridden) { badge.textContent = '已覆盖'; badge.className = 'p-badge'; }
+  else { badge.textContent = '默认'; badge.className = 'p-badge default'; }
+}
+document.getElementById('p-reload').addEventListener('click', loadPrompts);
+
+// ====================== 运行日志 ======================
+let rlItems = [];
+
+function fmtSize(n) {
+  if (n > 1048576) return (n / 1048576).toFixed(1) + ' MB';
+  if (n > 1024) return (n / 1024).toFixed(1) + ' KB';
+  return n + ' B';
+}
+function rlTime(ts) {
+  const d = new Date((ts || 0) * 1000);
+  const p = x => String(x).padStart(2, '0');
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+function rlSummary(it) {
+  const t = it.type;
+  if (t === 'turn') return (it.mode || '') + ' · ' + (it.query || '');
+  if (t === 'intent') {
+    const p = it.parsed || {};
+    return (p.action || '?') + ' · kw=' + (p.business_keyword || '') +
+      (it.fallback && it.fallback !== 'ok' ? ' · 兜底:' + it.fallback : '');
+  }
+  if (t === 'llm') {
+    const inLen = String(it.context || '').length;
+    return (it.stage || '') + ' · 入参' + (inLen ? inLen + '字' : '无') +
+      ' · ' + String(it.text || '').slice(0, 60);
+  }
+  if (t === 'graph') return (it.stage ? '【' + it.stage + '】' : '') +
+    (it.err ? '✗ ' + it.err : (it.rows == null ? '?' : it.rows) + ' 行') +
+    ' · ' + String(it.cypher || '').replace(/\s+/g, ' ').slice(0, 90);
+  if (t === 'search') return (it.stage || '') + ' · ' + (it.keyword || '') + ' · ' + (it.hits || 0) + ' 命中';
+  if (t === 'adhoc') return it.cypher
+    ? (it.error ? '✗ ' : (it.rows || 0) + ' 行 · ') + String(it.cypher).replace(/\s+/g, ' ').slice(0, 70)
+    : '未生成 Cypher';
+  if (t === 'state') return it.cleared ? '已清空'
+    : ((it.selected ? '已选 ' + it.selected + ' · ' : '') + '候选 ' + (it.candidates || 0));
+  if (t === 'turn_end') return (it.ms || 0) + 'ms · ' + ((it.answer || '').length || 0) + ' 字' +
+    (it.interrupted ? ' · 中断' : '') + (it.has_error ? ' · 出错' : '');
+  if (t === 'error') return (it.err || '');
+  return '';
+}
+function renderRunLog() {
+  const list = document.getElementById('ad-rl-list');
+  const f = document.getElementById('ad-rl-filter').value;
+  const items = f ? rlItems.filter(it => it.type === f) : rlItems;
+  if (!items.length) {
+    list.innerHTML = '<div class="rl-empty">暂无日志' +
+      (document.getElementById('ad-rl-toggle').checked ? '' : '（记录已暂停）') + '</div>';
+    return;
+  }
+  list.innerHTML = items.map(it =>
+    '<div class="rl-item"><div class="rl-head">' +
+    '<span class="rl-time">' + rlTime(it.ts) + '</span>' +
+    '<span class="rl-type rl-type-' + esc(it.type || '') + '">' + esc(it.type || '') + '</span>' +
+    '<span class="rl-sum">' + esc(rlSummary(it)) + '</span></div>' +
+    '<pre class="rl-pre">' + esc(JSON.stringify(it, null, 2)) + '</pre></div>').join('');
+  Array.from(list.querySelectorAll('.rl-head')).forEach(head => {
+    head.addEventListener('click', () => head.parentElement.classList.toggle('open'));
+  });
+}
+async function loadRunLog(limit) {
+  try {
+    const r = await fetch('/api/runlog?limit=' + (limit || 400));
+    if (!r.ok) { document.getElementById('ad-rl-list').innerHTML = '<div class="rl-empty">加载失败（HTTP ' + r.status + '）</div>'; return; }
+    const d = await readJson(r);
+    rlItems = d.items || [];
+    document.getElementById('ad-rl-toggle').checked = !!d.enabled;
+    document.getElementById('ad-rl-meta').textContent =
+      (d.path || '') + ' · ' + fmtSize(d.size || 0) +
+      (d.enabled ? ' · 记录中' : ' · 已暂停');
+    renderRunLog();
+  } catch (e) {
+    document.getElementById('ad-rl-list').innerHTML = '<div class="rl-empty">加载失败：' + esc(e.message) + '</div>';
+  }
+}
+document.getElementById('ad-rl-filter').addEventListener('change', renderRunLog);
+document.getElementById('ad-rl-refresh').addEventListener('click', () => loadRunLog());
+document.getElementById('ad-rl-dl').addEventListener('click', () => {
+  location.href = '/api/runlog/download';
+});
+document.getElementById('ad-rl-clear').addEventListener('click', async () => {
+  if (!confirm('清空运行日志文件？（不影响对话历史）')) return;
+  try { await fetch('/api/runlog/clear', { method: 'POST' }); } catch (e) { /* 刷新见分晓 */ }
+  loadRunLog();
+});
+// 单键 POST：settings.save 合并语义保证其余配置不动
+async function postToggle(key, checked, cbEl) {
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: checked ? '1' : '0' }),
+    });
+    const d = await readJson(r);
+    if (!r.ok) { alert(d.error || '保存失败'); cbEl.checked = !cbEl.checked; return false; }
+    return true;
+  } catch (e) {
+    alert('保存失败：' + e.message);
+    cbEl.checked = !cbEl.checked;
+    return false;
+  }
+}
+document.getElementById('ad-rl-toggle').addEventListener('change', async e => {
+  if (await postToggle('debug_log', e.target.checked, e.target)) loadRunLog();
+});
+document.getElementById('ad-rl-detail').addEventListener('change', e => {
+  postToggle('debug_log_detail', e.target.checked, e.target);
+});
+
+// ============ 图谱绑定：快速绑定 + 完整向导（自 index.html 整体移植） ============
+document.getElementById('sn-bind-btn').addEventListener('click', async () => {
+  setMsg('sn-bind-msg', '绑定中（读取图 schema，可能需要数十秒）…');
+  const btn = document.getElementById('sn-bind-btn');
+  btn.disabled = true;
+  try {
+    // 空表单 = 服务端用当前运行配置（已保存的 galaxy_*）
+    const r = await fetch('/api/schema/bind', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const d = await readJson(r);
+    setMsg('sn-bind-msg', d.msg || d.error || (d.ok ? '完成' : '失败'), !d.ok);
+    if (d.ok) loadSchemaNotes();
+  } catch (e) { setMsg('sn-bind-msg', '失败：' + e.message, true); }
+  btn.disabled = false;
+});
+
+let wizardGraph = '';   // 扫描返回的图名；GET 接口的 graph 参数用它（兜底表单值）
+
+function badge(text, cls) {
+  return '<span class="badge ' + cls + '">' + text + '</span>';
+}
+function renderIdValidation(iv) {
+  // 形如 {候选属性: {total, nonempty, distinct, valid}}（gateway Q04 实查结果）
+  const keys = Object.keys(iv || {});
+  if (!keys.length) return badge('主键缺失', 'warn');
+  const okKeys = keys.filter(k => (iv[k] || {}).valid);
+  if (okKeys.length) return badge('主键有效', 'ok') + ' ' + esc(okKeys.join('/'));
+  return badge('主键无效/冲突', 'err') + ' ' + esc(keys.join('/'));
+}
+function wizardGraphRaw() {
+  return wizardGraph || (collectCfg().galaxy_graph || '');
+}
+function wizardGraphParam() {
+  return encodeURIComponent(wizardGraphRaw());
+}
+function bindMeta(text) {
+  document.getElementById('bind-meta').textContent = text;
+}
+
+function switchBindStep(step) {
+  document.querySelectorAll('.bind-step-btn').forEach(btn =>
+    btn.classList.toggle('on', btn.dataset.bindStep === step));
+  ['scan', 'relations', 'diff', 'publish', 'versions'].forEach(k => {
+    const pane = document.getElementById('bind-step-' + k);
+    pane.style.display = (k === step) ? '' : 'none';
+  });
+  // 切到某步时若从未加载过则自动拉取（scan 需手动点，扫描较慢）
+  if (step === 'relations' && !relationsLoaded) loadRelations();
+  if (step === 'diff' && !diffLoaded) loadDiff();
+  if (step === 'versions' && !versionsLoaded) loadVersions();
+}
+document.querySelectorAll('.bind-step-btn').forEach(btn =>
+  btn.addEventListener('click', () => switchBindStep(btn.dataset.bindStep)));
+
+let relationsLoaded = false, diffLoaded = false, versionsLoaded = false;
+
+// ---- ① 扫描 ----
+async function runScan() {
+  const btn = document.getElementById('bind-scan-btn');
+  const out = document.getElementById('bind-scan-out');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '扫描中…';
+  out.innerHTML = '<div class="bind-tip">正在扫描图结构（getSchema + Cypher 抽样交叉验证），大图可能需要数十秒…</div>';
+  relationsLoaded = diffLoaded = versionsLoaded = false;
+  try {
+    const r = await fetch('/api/schema/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectCfg()),
+    });
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '扫描失败') + '</div>'; return; }
+    wizardGraph = d.graph || '';
+    bindMeta('图「' + d.graph + '」｜结构来源：' + (d.schema_source || '—') +
+      '｜' + d.node_type_count + ' 类节点 / ' + d.rel_type_count + ' 类关系｜候选已生成（未发布）');
+    let h = '';
+    if ((d.scan_warnings || []).length) {
+      h += '<div class="bind-warn">⚠ ' + d.scan_warnings.map(esc).join('\n⚠ ') + '</div>';
+    }
+    h += '<table class="bind-table"><thead><tr><th>节点类型</th><th>观察到的节点数</th><th>声明主键</th><th>主键实查</th><th>属性数</th></tr></thead><tbody>';
+    (d.node_types || []).forEach(t => {
+      h += '<tr><td>' + esc(t.name) + '</td><td>' +
+        (t.observed_count == null ? '—' : esc(t.observed_count)) + '</td><td>' +
+        esc(t.declared_id || '—') + '</td><td>' +
+        renderIdValidation(t.id_validation) +
+        '</td><td>' + ((t.props || []).length) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    const reconfirm = d.reconfirm_required || [];
+    if (reconfirm.length) {
+      h += '<div class="bind-warn">需人工确认（旧配置带入但结构未匹配）：' +
+        reconfirm.map(esc).join('、') + '</div>';
+    }
+    h += '<div class="bind-tip">下一步：② 查看关系语义确认情况 → ③ 差异预览 → ④ 校验 → 发布。</div>';
+    out.innerHTML = h;
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+document.getElementById('bind-scan-btn').addEventListener('click', runScan);
+
+// ---- ② 关系语义 ----
+async function loadRelations(notice) {
+  const btn = document.getElementById('bind-relations-btn');
+  const out = document.getElementById('bind-relations-out');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '加载中…';
+  try {
+    const r = await fetch('/api/schema/relations?graph=' + wizardGraphParam());
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '读取失败') + '</div>'; return; }
+    relationsLoaded = true;
+    bindMeta('关系清单来源：' + (d.source === 'published' ? '已发布配置' :
+      d.source === 'candidate' ? '候选配置（尚未发布，② 的确认会保存在这里）' : '无'));
+    let noticeHtml = notice ? '<div class="bind-ok">' + esc(notice) + '</div>' : '';
+    const relMeanings = d.relationship_meanings || {};
+    let h = '<table class="bind-table"><thead><tr><th>关系</th><th>端点</th><th>观察到的边数</th><th>语义类别</th><th>边属性</th><th>状态</th></tr></thead><tbody>';
+    (d.relations || []).forEach(c => {
+      const states = [];
+      states.push(c.verified ? badge('查询已验证', 'ok') : badge('结构待验证', 'warn'));
+      if (c.dependency_enabled) states.push(badge('依赖·传播影响', 'ok'));
+      if (c.semantics_confirmed) states.push(badge('语义已确认', 'ok'));
+      else states.push(badge('语义未确认', 'off'));
+      h += '<tr><td>' + esc(c.relation) + '</td><td>' +
+        esc((c.source || '?') + ' -→ ' + (c.target || '?')) + '</td><td>' +
+        (c.observed_count == null ? '—' : esc(c.observed_count)) + '</td><td>' +
+        esc(c.semantic_type || 'association') + '</td><td>' +
+        ((c.rel_props || []).length ? esc(c.rel_props.join('、')) : '—') +
+        '</td><td>' + states.join('') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    // ---- 语义确认操作区：逐条勾选 + 填含义 + 选深度，保存到候选配置 ----
+    const deps = d.dependency_paths || [];
+    const depMap = {};
+    deps.forEach(p => {
+      depMap[(p.source || '') + '|' + (p.relation || '') + '|' + (p.target || '')] = p;
+    });
+    h += '<div class="bind-tip" style="margin-top:10px">先确认关系的真实含义和分类，'
+      + '确认语义并明确影响方向后即可勾选「允许传播」（组成、职责、候选依赖等分类均可；'
+      + '声明但图中暂无数据的关系也可保存，校验时仅作提示，补数据后自动参与传播）。</div>';
+    h += '<table class="bind-table"><thead><tr><th>语义确认</th><th>起点 → 终点</th><th>关系</th><th>分类</th><th>含义（确认时必填）</th><th>允许传播</th><th>影响方向</th><th>深度</th></tr></thead><tbody>';
+    const rels = d.relations || [];
+    if (!rels.length) h += '<tr><td colspan="6">（无关系目录，请先扫描）</td></tr>';
+    rels.forEach((c, i) => {
+      const key = (c.source || '') + '|' + (c.relation || '') + '|' + (c.target || '');
+      const p = depMap[key];
+      const suggest = relMeanings[c.relation] || '';
+      const propsHint = (c.rel_props || []).length
+        ? '边属性：' + c.rel_props.join('、') : '';
+      const semConfirmed = !!c.semantics_confirmed;
+      const enabled = !!c.dependency_enabled;
+      const kind = c.semantic_type || 'association';
+      const impact = (p && p.impact_direction) || c.impact_direction || 'none';
+      const kinds = [['association','普通关联'],['composition','组成关系'],['dependency','业务依赖'],
+        ['responsibility','职责关系'],['organization','组织关系'],['ownership','权属关系'],
+        ['candidate_dependency','候选依赖'],['unknown','待确认']];
+      h += '<tr data-src="' + esc(c.source || '') + '" data-rel="' + esc(c.relation || '') +
+        '" data-dst="' + esc(c.target || '') + '">' +
+        '<td><input type="checkbox" class="dep-confirm"' + (semConfirmed ? ' checked' : '') + '></td>' +
+        '<td>' + esc((c.source || '?') + ' → ' + (c.target || '?')) +
+        (propsHint ? '<div style="font-size:11px;color:#888">' + esc(propsHint) + '</div>' : '') + '</td>' +
+        '<td>' + esc(c.relation) + '</td>' +
+        '<td><select class="dep-kind">' + kinds.map(k => '<option value="' + k[0] + '"' +
+          (kind === k[0] ? ' selected' : '') + '>' + k[1] + '</option>').join('') + '</select></td>' +
+        '<td><input type="text" class="dep-meaning" placeholder="按业务实际填写" value="' +
+          esc(c.meaning || (p && p.meaning) || '') + '" style="width:95%">' +
+          (suggest ? '<div style="font-size:11px;color:#888;margin-top:2px;white-space:normal">建议：' +
+            esc(suggest) + '</div>' : '') + '</td>' +
+        '<td><input type="checkbox" class="dep-enabled"' + (enabled ? ' checked' : '') + '></td>' +
+        '<td><select class="dep-impact">' +
+          [['none','不传播'],['target_to_source','终点变化 → 影响起点'],
+            ['source_to_target','起点变化 → 影响终点']].map(k =>
+              '<option value="' + k[0] + '"' + (impact === k[0] ? ' selected' : '') +
+              '>' + k[1] + '</option>').join('') + '</select></td>' +
+        '<td><select class="dep-depth">' + [1, 2, 3].map(n => '<option value="' + n + '"' +
+          ((p && p.depth || 1) == n ? ' selected' : '') + '>' + n + ' 跳</option>').join('') +
+        '</select></td></tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div style="margin-top:8px"><button id="bind-confirm-btn" class="btn">保存语义确认</button>' +
+      '<span id="bind-confirm-msg" class="msg" style="margin-left:8px"></span></div>';
+    if (deps.length) {
+      h += '<div class="bind-ok" style="margin-top:8px">已确认依赖路径（' + deps.length +
+        ' 条，只有这些会传播影响）：</div>';
+      h += '<table class="bind-table"><thead><tr><th>依赖方</th><th>关系</th><th>被依赖方</th><th>含义</th><th>深度</th><th>确认来源</th></tr></thead><tbody>';
+      deps.forEach(p => {
+        h += '<tr><td>' + esc(p.source || '（任意）') + '</td><td>' + esc(p.relation) +
+          '</td><td>' + esc(p.target || '（任意）') + '</td><td>' + esc(p.meaning || '') +
+          '</td><td>' + esc(p.depth || 1) + '</td><td>' + esc(p.confirmed_source || '') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    } else {
+      h += '<div class="bind-warn" style="margin-top:8px">尚无人工确认的依赖路径（dependency_paths 为空）：分析时不会传播影响，'
+        + '只能给出结构关联证据，不能断定「无受影响业务」。请在上方表格勾选并保存。</div>';
+    }
+    out.innerHTML = noticeHtml + h;
+    document.getElementById('bind-confirm-btn').addEventListener('click', saveConfirm);
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+async function saveConfirm() {
+  const btn = document.getElementById('bind-confirm-btn');
+  const msg = document.getElementById('bind-confirm-msg');
+  const out = document.getElementById('bind-relations-out');
+  const rows = [];
+  out.querySelectorAll('tr[data-src]').forEach(tr => {
+    const cb = tr.querySelector('.dep-confirm');
+    const mn = tr.querySelector('.dep-meaning');
+    const dp = tr.querySelector('.dep-depth');
+    const enabled = tr.querySelector('.dep-enabled');
+    const impact = tr.querySelector('.dep-impact');
+    const kind = tr.querySelector('.dep-kind');
+    if (!cb || !mn || !dp || !enabled || !impact || !kind) return;
+    rows.push({
+      source: tr.getAttribute('data-src'),
+      relation: tr.getAttribute('data-rel'),
+      target: tr.getAttribute('data-dst'),
+      confirmed: cb.checked,
+      dependency_enabled: enabled.checked,
+      impact_direction: impact.value,
+      semantic_type: kind.value,
+      meaning: mn.value.trim(),
+      depth: parseInt(dp.value, 10) || 1,
+    });
+  });
+  const uncheckedMeaning = rows.some(r => r.confirmed && !r.meaning);
+  if (uncheckedMeaning) { msg.className = 'msg err'; msg.textContent = '勾选确认的关系必须填写含义'; return; }
+  if (rows.some(r => r.dependency_enabled && (!r.confirmed || r.impact_direction === 'none'))) {
+    msg.className = 'msg err'; msg.textContent = '启用依赖传播需要确认语义并明确影响方向（分类不限）'; return;
+  }
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '保存中…';
+  try {
+    const r = await fetch('/api/schema/confirm_relations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: wizardGraphRaw(), relations: rows }),
+    });
+    const d = await readJson(r);
+    if (!d.ok) { msg.className = 'msg err'; msg.textContent = d.msg || '保存失败'; return; }
+    msg.className = 'msg ok';
+    msg.textContent = '已写入候选配置：确认 ' + d.confirmed + ' 条，移除 ' + d.removed + ' 条。请继续 ④ 校验 → ⑤ 发布。';
+    diffLoaded = false;   // 差异预览需按新候选重算
+    loadRelations('已保存语义确认：确认 ' + d.confirmed + ' 条，移除 ' + d.removed +
+      ' 条（写入候选配置，发布后生效）。请继续 ④ 校验 → ⑤ 发布。');
+  } catch (e) {
+    msg.className = 'msg err'; msg.textContent = '请求失败：' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+document.getElementById('bind-relations-btn').addEventListener('click', () => loadRelations());
+
+// ---- ③ 差异 ----
+async function loadDiff() {
+  const btn = document.getElementById('bind-diff-btn');
+  const out = document.getElementById('bind-diff-out');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '加载中…';
+  try {
+    const r = await fetch('/api/schema/diff?graph=' + wizardGraphParam());
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '读取失败') + '</div>'; return; }
+    diffLoaded = true;
+    let h = '<div class="bind-tip">目标图：' + esc(d.graph) +
+      (d.has_published ? '（已有已发布配置，下表为相对它的增量）' : '（尚无已发布配置）') +
+      '｜保留人工成果：别名 ' + ((d.curated_preserved || {}).aliases || 0) + '、影响规则 ' +
+      ((d.curated_preserved || {}).influence_rules || 0) + '、查询示例 ' +
+      ((d.curated_preserved || {}).query_examples || 0) + '</div>';
+    const row = (label, val, cls) => '<tr><td>' + esc(label) + '</td><td>' +
+      (val && val.length ? (cls ? val.map(x => badge(esc(x), cls)).join('') : val.map(esc).join('、'))
+        : '—') + '</td></tr>';
+    h += '<table class="bind-table"><tbody>';
+    h += row('新增实体类型', d.labels_added, 'ok');
+    h += row('移除实体类型', d.labels_removed, 'err');
+    h += row('新增关系', d.relations_added, 'ok');
+    h += row('移除关系', d.relations_removed, 'err');
+    h += row('依赖路径·保留', d.dependency_kept, 'ok');
+    h += row('依赖路径·新增', d.dependency_added, 'warn');
+    h += row('依赖路径·丢失', d.dependency_dropped, 'err');
+    h += '</tbody></table>';
+    if ((d.id_changes || []).length) {
+      h += '<div class="bind-warn">主键变更（影响实体精确定位，需重点核对）：</div>';
+      h += '<table class="bind-table"><thead><tr><th>类型</th><th>旧主键</th><th>新主键</th></tr></thead><tbody>';
+      d.id_changes.forEach(c => {
+        h += '<tr><td>' + esc(c.label) + '</td><td>' + esc(c.old || '—') +
+          '</td><td>' + esc(c.new || '—') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    if ((d.core_semantics_changes || []).length) {
+      h += '<div class="bind-tip">核心语义字段变更：' + d.core_semantics_changes.map(c =>
+        esc(c.field + ': ' + (c.old == null ? '空' : c.old) + ' → ' + (c.new == null ? '空' : c.new))
+      ).join('；') + '</div>';
+    }
+    const rec = d.reconfirm_required || [];
+    if (rec.length) h += '<div class="bind-warn">需人工重新确认：' + rec.map(esc).join('、') + '</div>';
+    out.innerHTML = h;
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+document.getElementById('bind-diff-btn').addEventListener('click', loadDiff);
+
+// ---- ④ 校验 / 发布 ----
+function checkBadge(st) {
+  if (st === 'passed') return badge('通过', 'ok');
+  if (st === 'needs_review') return badge('需复核', 'warn');
+  if (st === 'failed') return badge('失败', 'err');
+  return badge(esc(st || '—'), 'off');
+}
+async function runValidate() {
+  const btn = document.getElementById('bind-validate-btn');
+  const out = document.getElementById('bind-publish-out');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '校验中…';
+  out.innerHTML = '<div class="bind-tip">正在校验候选配置（主键实查 / 关系结构 / 依赖语义 / 查询冒烟）…</div>';
+  try {
+    const r = await fetch('/api/schema/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({}, collectCfg(),
+        { graph: wizardGraphRaw() })),   // 与扫描同一图名，防止回退到服务默认图
+    });
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '校验失败') + '</div>'; return; }
+    const rp = d.report || {};
+    let h = '<div class="bind-tip">总体：' + checkBadge(rp.overall) + '</div>';
+    h += '<table class="bind-table"><thead><tr><th>检查项</th><th>状态</th><th>说明</th></tr></thead><tbody>';
+    const items = [
+      ['格式检查', (rp.format_check || {}).status, '配置 JSON 结构与必填字段'],
+      ['标识符检查（主键实查）', (rp.identifier_check || {}).status,
+        '覆盖 ' + ((rp.identifier_check || {}).coverage || '—') +
+        '；有效 ' + ((rp.identifier_check || {}).ids_valid || 0) +
+        ' / 已配置 ' + ((rp.identifier_check || {}).ids_configured || 0) +
+        (((rp.identifier_check || {}).labels_empty || []).length
+          ? '；无数据类型 ' + rp.identifier_check.labels_empty.length + ' 类（见下方警告）' : '')],
+      ['关系结构检查', (rp.relation_structure_check || {}).status,
+        '已确认路径实查 ' + ((rp.relation_structure_check || {}).count || 0) + ' 条；缺失 ' +
+        ((rp.relation_structure_check || {}).missing || 0) +
+        '；关系目录 ' + ((rp.relation_structure_check || {}).catalog_total || 0) +
+        ' 条（扫描观察 ' + ((rp.relation_structure_check || {}).catalog_observed || 0) +
+        ' 条）。未确认依赖路径时无可实查项属正常'],
+      ['依赖语义检查', (rp.dependency_semantics_check || {}).status,
+        '已确认路径 ' + ((rp.dependency_semantics_check || {}).verified_paths || 0) +
+        ' / 总路径 ' + ((rp.dependency_semantics_check || {}).total_paths || 0)],
+      ['查询冒烟', (rp.query_smoke_check || {}).status, ''],
+    ];
+    items.forEach(it => {
+      h += '<tr><td>' + esc(it[0]) + '</td><td>' + checkBadge(it[1]) + '</td><td>' +
+        esc(it[2]) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    const errs = rp.errors || [], warns = rp.warnings || [];
+    if (errs.length) h += '<div class="bind-err">错误：' + errs.map(esc).join('\n') + '</div>';
+    if (warns.length) h += '<div class="bind-warn">⚠ ' + warns.map(esc).join('\n⚠ ') + '</div>';
+    h += '<div class="bind-tip">校验通过后点「发布候选配置」；发布后旧配置自动备份，可在 ⑤ 回滚。</div>';
+    out.innerHTML = h;
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+async function runPublish() {
+  const btn = document.getElementById('bind-publish-btn');
+  const out = document.getElementById('bind-publish-out');
+  if (!confirm('发布候选配置为当前图的生效配置？发布后可在「版本 / 回滚」撤销。')) return;
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '发布中…';
+  try {
+    const payload = Object.assign({}, collectCfg(),
+      { graph: wizardGraphRaw() });
+    let r = await fetch('/api/schema/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    let d = await readJson(r);
+    if (d.requires_review_ack && confirm('校验存在待复核项，仍要发布吗？请确认这些项不会影响当前业务查询。')) {
+      payload.acknowledge_review = true;
+      r = await fetch('/api/schema/publish', {method:'POST',
+        headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      d = await readJson(r);
+    }
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '发布失败') + '</div>'; return; }
+    versionsLoaded = false;
+    let h = '<div class="bind-ok">已发布：图「' + esc(d.graph) + '」版本 ' + esc(d.version) +
+      '（校验状态：' + esc(d.validation_overall || '—') + '）</div>';
+    (d.warnings || []).forEach(w => h += '<div class="bind-warn">⚠ ' + esc(w) + '</div>');
+    out.innerHTML = h;
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+document.getElementById('bind-validate-btn').addEventListener('click', runValidate);
+document.getElementById('bind-publish-btn').addEventListener('click', runPublish);
+
+// ---- ⑤ 版本 / 回滚 ----
+async function loadVersions() {
+  const btn = document.getElementById('bind-versions-btn');
+  const out = document.getElementById('bind-versions-out');
+  btn.disabled = true; const old = btn.textContent; btn.textContent = '加载中…';
+  try {
+    const r = await fetch('/api/schema/versions?graph=' + wizardGraphParam());
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '读取失败') + '</div>'; return; }
+    versionsLoaded = true;
+    const vs = d.versions || [];
+    if (!vs.length) { out.innerHTML = '<div class="bind-tip">暂无历史版本（首次发布后出现）。</div>'; return; }
+    let h = '<table class="bind-table"><thead><tr><th>版本</th><th>时间</th><th>动作</th><th>校验</th><th></th></tr></thead><tbody>';
+    vs.forEach(v => {
+      h += '<tr><td>' + esc(v.version) + '</td><td>' + esc(v.time || '—') + '</td><td>' +
+        esc(v.action || '—') + '</td><td>' + checkBadge(v.validation_overall) + '</td><td>' +
+        '<button type="button" class="btn bind-rollback-btn" data-v="' + esc(v.version) +
+        '">回滚到此版</button></td></tr>';
+    });
+    h += '</tbody></table>';
+    out.innerHTML = h;
+    out.querySelectorAll('.bind-rollback-btn').forEach(b => {
+      b.addEventListener('click', () => runRollback(b.dataset.v));
+    });
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+async function runRollback(version) {
+  if (!confirm('回滚到版本 ' + version + '？当前配置会先自动备份。')) return;
+  const out = document.getElementById('bind-versions-out');
+  try {
+    const r = await fetch('/api/schema/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graph: wizardGraphRaw(), version: version }),
+    });
+    const d = await readJson(r);
+    if (!d.ok) { out.innerHTML = '<div class="bind-err">' + esc(d.msg || '回滚失败') + '</div>'; return; }
+    out.innerHTML = '<div class="bind-ok">已回滚到 ' + esc(version) + '，新当前版本：' +
+      esc(d.version) + '</div>' + out.innerHTML;
+    versionsLoaded = false;
+  } catch (e) {
+    out.innerHTML = '<div class="bind-err">请求失败：' + esc(e.message) + '</div>';
+  }
+}
+document.getElementById('bind-versions-btn').addEventListener('click', loadVersions);
+
+// ====================== schema_notes 补充校对（别名 / 非依赖关系含义） ======================
+const snState = { relationships: [] };
+
+async function loadSchemaNotes() {
+  const tip = document.getElementById('ad-sn-meta-tip');
+  tip.textContent = '加载中…';
+  try {
+    const r = await fetch('/api/schema/notes');
+    const d = await readJson(r);
+    if (!d.ok) { tip.textContent = '加载失败：' + (d.msg || ''); return; }
+    snState.relationships = d.relationships || [];
+    tip.textContent = '当前图：' + (d.graph || '') + '｜配置文件：' + (d.notes_file || '') +
+      '｜共 ' + (d.labels || []).length + ' 类实体 / ' + snState.relationships.length + ' 类关系';
+    renderAliases(d.aliases || {});
+    renderMeanings(d.relationship_meanings || {});
+  } catch (e) { tip.textContent = '加载失败：' + e.message; }
+}
+document.getElementById('ad-sn-reload').addEventListener('click', loadSchemaNotes);
+
+function snOption(value, selected) {
+  const o = document.createElement('option');
+  o.value = value; o.textContent = value;
+  if (value === selected) o.selected = true;
+  return o;
+}
+function renderAliases(data) {
+  const tbody = document.getElementById('ad-sn-aliases-tbody');
+  tbody.innerHTML = '';
+  Object.keys(data).forEach(k => addAliasRow(k, (data[k] || []).join(', ')));
+}
+function addAliasRow(key, val) {
+  const tbody = document.getElementById('ad-sn-aliases-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td><input class="sn-k" placeholder="同义词" /></td>' +
+    '<td><input class="sn-v" placeholder="label1, label2" /></td>' +
+    '<td><button type="button" class="sn-del">删除</button></td>';
+  tr.querySelector('.sn-k').value = key || '';
+  tr.querySelector('.sn-v').value = val || '';
+  tr.querySelector('.sn-del').onclick = () => tr.remove();
+  tbody.appendChild(tr);
+}
+function renderMeanings(data) {
+  const tbody = document.getElementById('ad-sn-meanings-tbody');
+  tbody.innerHTML = '';
+  Object.keys(data).forEach(k => {
+    const v = data[k] || {};
+    addMeaningRow(k, v['含义'] || v['meaning'] || '', v['方向'] || v['direction'] || '');
+  });
+}
+function addMeaningRow(rel, meaning, direction) {
+  const tbody = document.getElementById('ad-sn-meanings-tbody');
+  const tr = document.createElement('tr');
+  const sel = document.createElement('select');
+  sel.className = 'sn-k';
+  sel.appendChild(snOption('', ''));
+  snState.relationships.forEach(r => sel.appendChild(snOption(r, rel)));
+  // 允许保留图里已删除的关系名（骨架可能有历史数据）
+  if (rel && !snState.relationships.includes(rel)) sel.appendChild(snOption(rel, rel));
+  const td1 = document.createElement('td'); td1.appendChild(sel);
+  const td2 = document.createElement('td');
+  td2.innerHTML = '<input class="sn-m" placeholder="留空 = 按关系名字面理解" />';
+  td2.querySelector('.sn-m').value = meaning || '';
+  const td3 = document.createElement('td');
+  td3.innerHTML = '<input class="sn-d" placeholder="A -> B" />';
+  td3.querySelector('.sn-d').value = direction || '';
+  const td4 = document.createElement('td');
+  td4.innerHTML = '<button type="button" class="sn-del">删除</button>';
+  td4.querySelector('.sn-del').onclick = () => tr.remove();
+  tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+  tbody.appendChild(tr);
+}
+document.querySelectorAll('.sn-add').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const kind = btn.dataset.add;
+    if (kind === 'aliases') addAliasRow('', '');
+    else if (kind === 'meanings') addMeaningRow('', '', '');
+  });
+});
+function collectAliases() {
+  const out = {};
+  document.querySelectorAll('#ad-sn-aliases-tbody tr').forEach(tr => {
+    const k = (tr.querySelector('.sn-k') || {}).value;
+    const v = (tr.querySelector('.sn-v') || {}).value;
+    if (!k || !v) return;
+    const arr = v.split(',').map(s => s.trim()).filter(Boolean);
+    if (arr.length) out[k.trim()] = arr;
+  });
+  return out;
+}
+function collectMeanings() {
+  const out = {};
+  document.querySelectorAll('#ad-sn-meanings-tbody tr').forEach(tr => {
+    const k = (tr.querySelector('.sn-k') || {}).value;
+    const m = (tr.querySelector('.sn-m') || {}).value;
+    const d = (tr.querySelector('.sn-d') || {}).value;
+    if (!k || !m) return;
+    out[k.trim()] = { meaning: m.trim(), direction: (d || '').trim() };
+  });
+  return out;
+}
+document.getElementById('ad-sn-save-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('ad-sn-save-btn');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  setMsg('ad-sn-save-msg', '');
+  try {
+    // 只提交别名与关系含义两个键（不传 report_headers，服务端保留原值）
+    const body = {
+      aliases: collectAliases(),
+      relationship_meanings: collectMeanings(),
+    };
+    const r = await fetch('/api/schema/notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await readJson(r);
+    if (r.ok && d.ok) setMsg('ad-sn-save-msg', '已保存并即时生效');
+    else setMsg('ad-sn-save-msg', '保存失败：' + (d.msg || d.error || r.statusText), true);
+  } catch (e) { setMsg('ad-sn-save-msg', '保存失败：' + e.message, true); }
+  btn.disabled = false;
+  btn.textContent = '保存 schema_notes';
+});
+
+// ====================== 初始化 ======================
+loadSettings();
+loadPrompts();
+loadRunLog();
+loadSchemaNotes();
+</script>
+</body>
+</html>
